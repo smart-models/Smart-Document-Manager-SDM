@@ -964,7 +964,7 @@ input[type="range"]:disabled::-moz-range-thumb { background: var(--muted); box-s
 }
 
 .param-name { font-size: 0.7rem; font-weight: 700; color: var(--blue); letter-spacing: 0.06em; }
-.param-desc { font-size: 0.68rem; color: var(--muted); margin-top: 0.2rem; }
+.param-desc { font-size: 0.68rem; color: var(--muted); margin-top: 0.2rem; overflow-wrap: anywhere; }
 
 /* ── Code / JSON blocks ──────────────────────────────────────── */
 
