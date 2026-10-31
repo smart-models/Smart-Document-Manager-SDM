@@ -1,0 +1,26 @@
+{
+  "table-over-maximum": {
+    "value": {
+      "metadata": { "document": "report.pdf" },
+      "chunks": [
+        { "id": 1, "text": "<table>\n<tr><th>Nome</th><th>Valore</th></tr>\n<tr><td>alfa</td><td>1</td></tr>\n<tr><td>beta</td><td>2</td></tr>\n<tr><td>gamma</td><td>3</td></tr>\n<tr><td>delta</td><td>4</td></tr>\n</table>\n", "token_count": 2000, "page": 1, "document": "report.pdf" },
+        { "id": 2, "text": "Middle prose paragraph", "token_count": 300, "page": 2, "document": "report.pdf" },
+        { "id": 3, "text": "Last prose paragraph", "token_count": 300, "page": 3, "document": "report.pdf" }
+      ]
+    },
+    "fragments": [
+      { "entries": [[0, 0, 20, "repeat"], [0, 20, 70]], "token_count": 700, "status": "within", "notes": ["table_split"] },
+      { "entries": [[0, 0, 20, "repeat"], [0, 70, 120]], "token_count": 700, "status": "within", "notes": ["table_split"] },
+      { "entries": [[0, 0, 20, "repeat"], [0, 120, 180]], "token_count": 600, "status": "within", "notes": ["table_split"] }
+    ]
+  },
+  "balanced": {
+    "value": {
+      "metadata": { "document": "report.pdf" },
+      "chunks": [
+        { "id": 1, "text": "First balanced paragraph", "token_count": 300, "page": 1, "document": "report.pdf" },
+        { "id": 2, "text": "Second balanced paragraph", "token_count": 300, "page": 1, "document": "report.pdf" }
+      ]
+    }
+  }
+}

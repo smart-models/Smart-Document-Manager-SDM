@@ -1,0 +1,58 @@
+# Local configuration and secrets: never ship real .env files in an image.
+.env
+**/.env
+**/.env.*
+**/*.env
+!**/.env.example
+
+# Local virtual environments, caches and scratch workspaces.
+.git/
+.gitignore
+.gitattributes
+.scratch/
+.venv/
+.venv-mcp/
+.venv-security/
+__pycache__/
+**/__pycache__/
+*.py[cod]
+**/*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.hypothesis/
+**/*.log
+**/.cache
+
+# Independent skills, docs, automation and test suites not consumed by the
+# multi-target root Dockerfile (ocr-mcp-server/ocr_mcp/ ships in the ocr-mcp target).
+/assets/
+ocr-mcp-server/dist/
+ocr-skill/
+my-superpowers/
+docs/
+guide/
+scripts/
+tests/
+benchmarks/
+ci-evidence/
+dependency-audit/
+release-evidence/
+
+# Frontend test/build tooling: only prebuilt frontend/dist/ ships in ocr-api.
+frontend/node_modules/
+frontend/playwright-report/
+frontend/test-results/
+frontend/tests/
+frontend/guide-tests/
+frontend/benchmarks/
+frontend/.gitignore
+frontend/package.json
+frontend/package-lock.json
+frontend/playwright.config.mjs
+frontend/playwright.guides.config.js
+
+# Repository guidance and root metadata not needed inside the container.
+README.md
+AGENTS.md
+LICENSE
+pyproject.toml

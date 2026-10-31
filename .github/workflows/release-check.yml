@@ -1,0 +1,111 @@
+name: Release check
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-check-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  checks:
+    uses: ./.github/workflows/ci.yml
+
+  offline-gate:
+    name: Release evidence and dependency audit
+    needs: checks
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: |
+            requirements/*.txt
+            ocr-mcp-server/pyproject.toml
+      - name: Record exact candidate metadata
+        shell: bash
+        env:
+          CHECK_RESULT: ${{ needs.checks.result }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          mkdir -p release-evidence/sbom
+          {
+            echo "commit=$(git rev-parse HEAD)"
+            echo "generated_at=$(date --utc --iso-8601=seconds)"
+            echo "check_result=$CHECK_RESULT"
+            echo "run=$RUN_URL"
+            python --version
+          } | tee release-evidence/metadata.txt
+      - name: Download this run's CI evidence
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: ci-*-${{ github.run_attempt }}
+          path: release-evidence
+          merge-multiple: true
+      - name: Verify dependency inventory and security constraints
+        shell: bash
+        run: |
+          set -euo pipefail
+          (
+            set -e
+            python -m scripts.verify_dependency_inventory
+            python scripts/security_constraints.py
+          ) 2>&1 | tee release-evidence/security-constraints.log
+      - name: Audit dependencies and generate SBOMs
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/verify_dependencies.py \
+            --triage requirements/audit-triage.json \
+            --sbom release-evidence/sbom \
+            --json-output release-evidence/dependency-audit.json \
+            2>&1 | tee release-evidence/dependency-audit.log
+      - name: Build evidence manifest
+        if: always()
+        run: >-
+          python scripts/release_evidence.py release-evidence
+          --require metadata.txt
+          --require lint.log
+          --require actionlint.log
+          --require shellcheck.log
+          --require psscriptanalyzer.log
+          --require unit.log
+          --require unit.xml
+          --require launchers.log
+          --require launchers.xml
+          --require frontend-unit.log
+          --require frontend-browser.log
+          --require guides.log
+          --require guides.xml
+          --require compose.log
+          --require wheel.log
+          --require mcp-wheel.json
+          --require security-constraints.log
+          --require dependency-audit.log
+          --require dependency-audit.json
+          --require sbom/app-py311-linux.cdx.json
+          --require sbom/mcp-py311-linux.cdx.json
+          --require sbom/vllm-py312-linux.cdx.json
+      - name: Upload release evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-evidence-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: release-evidence/
+          if-no-files-found: error
+          retention-days: 90
+      - name: Require successful candidate checks
+        if: always()
+        env:
+          CHECK_RESULT: ${{ needs.checks.result }}
+        shell: bash
+        run: test "$CHECK_RESULT" = success

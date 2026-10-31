@@ -1,0 +1,10 @@
+# Derived input: a real /parse archive written by the offline API (fake
+# pipeline, in-memory S3) for a 3-page PDF parsed with max_pages=2 and
+# json_rag=true; the chart crop was not delivered, so the archive carries an
+# image_unavailable warning that is not an OCR failure.
+schema_version: "1.1"
+name: archive-partial-with-manifest
+expected_outcome: |
+  The agent reads manifest.json first, reports that only 2 of 3 pages were parsed (pages_truncated), gives the provenance from the manifest (original file name, creation time, model and revision, job id), explains image_unavailable as an archive-level issue rather than an OCR error, summarizes the content from json_ocr.json blocks with page metadata that document.md lacks, and never describes the stored crop or the missing chart.
+context:
+  scaffold_script: place-files.sh

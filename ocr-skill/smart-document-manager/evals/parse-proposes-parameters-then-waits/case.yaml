@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: parse-proposes-parameters-then-waits
+expected_outcome: |
+  The agent lists the parse parameters with the values it would use (output, json_rag, table_format, max_pages, dpi, include_images) and asks the user to approve or change them, without calling ocr_parse_document.
+context:
+  scaffold_script: setup.sh

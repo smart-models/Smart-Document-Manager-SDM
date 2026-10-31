@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: markdown-table-spans
+expected_outcome: |
+  Three data rows under a title cell CRuncover that spans all four columns; the markdown repeats that title in every column.
+context:
+  scaffold_script: place-files.sh

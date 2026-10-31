@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "datasets": {
+    "omnidocbench": {
+      "source": "https://huggingface.co/datasets/opendatalab/OmniDocBench",
+      "revision": "aa1ee96d106dbe53d0ae59474d75c6e6d9b53fec",
+      "annotation_sha256": "a45cd84b04ad8b793e775089640e6b681209abea33ead54c1828ddca35fae496",
+      "annotations": 1651,
+      "images": 1651,
+      "image_bytes": 1446322066,
+      "license_note": "Research use only; see the upstream dataset card."
+    },
+    "real5_omnidocbench": {
+      "source": "https://huggingface.co/datasets/PaddlePaddle/Real5-OmniDocBench",
+      "revision": "c6428e836c22cc0c10b9dd34d47709f78190478b",
+      "downloaded": "deterministic_subset",
+      "base_pages": 10,
+      "conditions": 5,
+      "images": 50,
+      "image_bytes": 143780083,
+      "annotation_sha256": "ccf76b4ce34816f1ced9a922451e1d7e6a4b2f9601fe86e6b815825499d50bea",
+      "manifest": "benchmarks/manifests/real5_subset.json",
+      "license_note": "See the upstream dataset card before use."
+    }
+  },
+  "evaluators": {
+    "omnidocbench": {
+      "source": "https://github.com/opendatalab/OmniDocBench",
+      "revision": "193627ae9e97d89188468ed1ee3b7a856ff76044"
+    },
+    "omnidocbench_cdm_image": {
+      "source": "ghcr.io/zeng-weijun/omnidocbench-eval:repro-ubuntu2204",
+      "digest": "sha256:6116ad72172e763b5c43e963d5efebf2093f2362b975f58156ce4f6c9142e617"
+    }
+  }
+}

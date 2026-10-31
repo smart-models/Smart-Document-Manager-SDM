@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: chart-values-not-read
+expected_outcome: |
+  No values are invented: the chart block is empty because parsing does not read charts; recognition with task chart reads them.
+context:
+  scaffold_script: place-files.sh

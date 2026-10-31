@@ -1,0 +1,6 @@
+# Repair upstream wheel metadata conflicts without changing Torch or vLLM.
+nvidia-nccl-cu13==2.29.7
+# GHSA-6q48-6c7w-9gw2 / PYSEC-2026-4320: emSign roots with compromised intermediates.
+certifi==2026.10.19
+# GHSA-hq85-5cpj-mr62 / PYSEC-2026-4321: uv's bundled CA store trusts the same root.
+uv==0.13.4

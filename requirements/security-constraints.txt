@@ -1,0 +1,10 @@
+# Exact transitive security overrides. Add advisory context when introducing a floor.
+# GHSA-6q48-6c7w-9gw2 / PYSEC-2026-4320: certifi bundles emSign roots whose
+# intermediate CA keys are compromised; fixed in 2026.10.19.
+certifi==2026.10.19
+# 28 Pillow advisories (CVE-2026-112390..112406, CVE-2026-112891..112902):
+# decoder/parser memory-safety and loop bugs; fixed in 13.0.0.
+pillow==13.0.0
+# GHSA-hq85-5cpj-mr62 / PYSEC-2026-4321: uv's bundled CA store trusts the same
+# compromised emSign root; fixed in 0.13.4.
+uv==0.13.4

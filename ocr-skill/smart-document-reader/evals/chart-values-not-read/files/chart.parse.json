@@ -1,0 +1,93 @@
+{
+ "pages": [
+  {
+   "page": 1,
+   "width": 800,
+   "height": 520,
+   "markdown": "Quarterly revenue 2026\n\n\n<img src=\"imgs/img_in_chart_box_73_68_772_495.jpg\" alt=\"Image\" width=\"87%\" />\n",
+   "blocks": [
+    {
+     "type": "figure_title",
+     "bbox": [
+      196.0,
+      19.0,
+      543.0,
+      54.0
+     ],
+     "content": "Quarterly revenue 2026",
+     "order": null,
+     "block_id": 0,
+     "group_id": 0,
+     "global_block_id": null,
+     "global_group_id": null,
+     "polygon": [
+      [
+       196.0,
+       22.0
+      ],
+      [
+       542.0,
+       22.0
+      ],
+      [
+       542.0,
+       53.0
+      ],
+      [
+       196.0,
+       53.0
+      ]
+     ],
+     "content_tokens": 9
+    },
+    {
+     "type": "chart",
+     "bbox": [
+      73.0,
+      68.0,
+      772.0,
+      495.0
+     ],
+     "content": "",
+     "order": null,
+     "block_id": 1,
+     "group_id": 1,
+     "global_block_id": null,
+     "global_group_id": null,
+     "polygon": [
+      [
+       73.0,
+       68.0
+      ],
+      [
+       772.0,
+       68.0
+      ],
+      [
+       772.0,
+       495.0
+      ],
+      [
+       73.0,
+       495.0
+      ]
+     ],
+     "content_tokens": 0
+    }
+   ],
+   "images": null,
+   "image_names": null,
+   "error": null
+  }
+ ],
+ "model_name": "PaddlePaddle/PaddleOCR-VL-1.6",
+ "pipeline_version": "v1.6",
+ "processing_time_ms": 3848.9291860023513,
+ "warnings": [],
+ "usage": {
+  "tokenizer": "PaddlePaddle/PaddleOCR-VL-1.6@c5630abae1d940eafe0697512a0325494b02ab42",
+  "content_tokens": 9,
+  "blocks": 2
+ },
+ "json_rag": null
+}

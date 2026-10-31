@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: numbered-footnotes-linked
+expected_outcome: |
+  Footnote 1 (p1:b5) is linked to the sentence in p1:b1 and footnote 2 (p1:b6) to the sentence in p1:b3 through their $ ^{n} $ markers.
+context:
+  scaffold_script: place-files.sh

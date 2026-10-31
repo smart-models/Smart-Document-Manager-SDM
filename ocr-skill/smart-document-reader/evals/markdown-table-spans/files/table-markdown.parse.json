@@ -1,0 +1,69 @@
+{
+ "pages": [
+  {
+   "page": 1,
+   "width": 551,
+   "height": 132,
+   "markdown": "\n| CRuncover | CRuncover | CRuncover | CRuncover |\n| --- | --- | --- | --- |\n| Dres | 连续工作3 | 取出来放在网上，没想 | 江、鳌江等八大 |\n| Abstr |  | rSrivi | $709. |\n| cludingGiv | 2.72 | Ingcubic | $744.78 |",
+   "blocks": [
+    {
+     "type": "table",
+     "bbox": [
+      0.0,
+      0.0,
+      551.0,
+      129.0
+     ],
+     "content": "<table><tr><td colspan=\"4\">CRuncover</td></tr><tr><td>Dres</td><td>连续工作3</td><td>取出来放在网上，没想</td><td>江、鳌江等八大</td></tr><tr><td>Abstr</td><td></td><td>rSrivi</td><td>$709.</td></tr><tr><td>cludingGiv</td><td>2.72</td><td>Ingcubic</td><td>$744.78</td></tr></table>",
+     "order": null,
+     "block_id": 0,
+     "group_id": 0,
+     "global_block_id": null,
+     "global_group_id": null,
+     "polygon": [
+      [
+       0.0,
+       0.0
+      ],
+      [
+       551.0,
+       0.0
+      ],
+      [
+       551.0,
+       129.0
+      ],
+      [
+       0.0,
+       129.0
+      ]
+     ],
+     "content_tokens": 136
+    }
+   ],
+   "images": null,
+   "image_names": null,
+   "error": null
+  }
+ ],
+ "model_name": "PaddlePaddle/PaddleOCR-VL-1.6",
+ "pipeline_version": "v1.6",
+ "processing_time_ms": 4990.186942042783,
+ "warnings": [
+  {
+   "code": "tables_spans_expanded",
+   "severity": "info",
+   "message": "1 table(s) had merged cells (rowspan/colspan) expanded into repeated values for pipe markdown.",
+   "target": {
+    "field": "table_format"
+   },
+   "details": null
+  }
+ ],
+ "usage": {
+  "tokenizer": "PaddlePaddle/PaddleOCR-VL-1.6@c5630abae1d940eafe0697512a0325494b02ab42",
+  "content_tokens": 136,
+  "blocks": 1
+ },
+ "json_rag": null
+}

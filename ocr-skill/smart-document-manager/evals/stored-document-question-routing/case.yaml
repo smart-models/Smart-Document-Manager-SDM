@@ -1,0 +1,10 @@
+# Plan-only case: two ocr_get_storage_archive details are given (a 3-page
+# report parsed with max_pages=2, and an 85-page report whose text file sizes
+# were measured on a real archive, image list abbreviated); no live stack is
+# needed and no tool is called.
+schema_version: "1.1"
+name: stored-document-question-routing
+expected_outcome: |
+  For each question the agent names the file(s) it needs and how to get them: completeness and provenance from the detail with no download; the figure question from json_ocr.json, noting that the chart crop is missing (image_unavailable) and that the one stored crop is the image box, with any visual description labelled as its own reading and chart values left unread; the 85-page summary from json_rag.json (303 KB) rather than the 648 KB json_ocr.json or document.md, saying that pages stay citable while block ids are gone and that document.md has no page boundaries; the ZIP and input.pdf never planned for reading.
+context:
+  scaffold_script: setup.sh

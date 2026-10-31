@@ -1,0 +1,25 @@
+.rag-workspace { color: inherit; max-width: 100%; }
+.rag-workspace p { line-height: 1.6; }
+.rag-workspace fieldset { margin: 1rem 0; padding: 1rem; border: 1px solid var(--line, var(--muted-2)); border-radius: 8px; }
+.rag-options-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 1rem; }
+.rag-metadata-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: .15rem .75rem; }
+.rag-help { font-size: .9rem; opacity: .8; }
+.rag-field { display: flex; flex-direction: column; gap: .35rem; }
+.rag-check { display: flex; align-items: center; gap: .5rem; margin: .75rem 0; }
+.rag-workspace input:not([type=checkbox]), .rag-workspace select { padding: .5rem; min-width: 0; max-width: 100%; background: var(--surface, var(--panel)); color: inherit; border: 1px solid var(--line, var(--muted-2)); border-radius: 4px; font: inherit; }
+.rag-workspace input[type=checkbox] { width: auto; }
+.rag-workspace button { margin: .4rem .4rem .4rem 0; }
+#rag-error:not(:empty) { border-left: 3px solid #cf594d; padding: .6rem 1rem; margin-top: 1rem; }
+.rag-previous, .rag-overflow { font-weight: 700; border-left: 3px solid #c58d24; padding-left: .8rem; }
+.rag-chunk { border: 1px solid var(--line, var(--muted-2)); border-radius: 8px; padding: 1rem; margin-top: 1rem; overflow: hidden; }
+.rag-chunk h3 { margin-top: 0; }
+.rag-chunk pre { overflow: auto; max-height: 28rem; }
+.rag-text { overflow-wrap: anywhere; overflow: auto; }
+.rag-text table { border-collapse: collapse; }
+.rag-text td, .rag-text th { border: 1px solid currentColor; padding: .4rem; }
+.rag-histogram { display: grid; grid-template-columns: repeat(auto-fit, minmax(95px, 1fr)); gap: .6rem; }
+.rag-histogram label { display: flex; flex-direction: column; font-size: .8rem; }
+.rag-histogram meter { width: 100%; }
+.rag-pagination { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; }
+#rag-workspace { margin: 1rem; padding: 1rem; border: 1px solid var(--line, var(--muted-2)); border-radius: 8px; }
+#rag-workspace > summary { cursor: pointer; font-weight: 700; }

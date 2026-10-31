@@ -1,0 +1,129 @@
+{
+  "$comment": "Testbook document corpus. `paddleocr` files are verbatim copies from source.repository at source.commit (Apache-2.0, see license_file); `generated` files come from generate.py, which also refreshes every sha256. `expect` lists strings the raw model output must contain; an empty list means only completion is asserted. testbook-coverage.test.mjs fails on any unlisted file, hash drift or file no book case uses.",
+  "source": {
+    "repository": "https://github.com/PaddlePaddle/PaddleOCR",
+    "commit": "dab3fe35379033fdcb2d0e9572fac0b36c9a9ebf",
+    "path": "tests/test_files",
+    "license": "Apache-2.0",
+    "license_file": "LICENSE-PaddleOCR.txt"
+  },
+  "files": [
+    {
+      "path": "textline.png",
+      "origin": "paddleocr",
+      "use": "ocr task: Chinese scene text line",
+      "expect": [
+        "绿洲仕格维花园公寓"
+      ],
+      "sha256": "5362ba97741413494c507237b5096ef09ed575a501c4d9e68bfeffe17528a6ad"
+    },
+    {
+      "path": "medal_table.png",
+      "origin": "paddleocr",
+      "use": "table task: medal table with Chinese headers",
+      "expect": [
+        "CHN",
+        "112"
+      ],
+      "sha256": "6d50148ceccb2d5cecc50b084b5105e3167f2d55a8899b29e04c3ebe46e88fa8"
+    },
+    {
+      "path": "table.jpg",
+      "origin": "paddleocr",
+      "use": "table task: bordered table with merged title and mixed scripts",
+      "expect": [
+        "CRuncover",
+        "744.78"
+      ],
+      "sha256": "acd113bb3a89b488941ee0962776a28e45897fa2802cd306ec3bb68d9043115c"
+    },
+    {
+      "path": "formula.png",
+      "origin": "paddleocr",
+      "use": "formula task: integral with Greek symbols",
+      "expect": [
+        "\\zeta"
+      ],
+      "sha256": "7885d4a349edcdfbfbc439305b8b554c2500f095949bc53d14835656b902dbcc"
+    },
+    {
+      "path": "chart.png",
+      "origin": "generated",
+      "use": "chart task: labelled bar chart",
+      "expect": [
+        "Q4",
+        "210"
+      ],
+      "sha256": "c356301fd056cd3da6d4395e36c9468b724ca4d0636311552e3e3532e15db0fc"
+    },
+    {
+      "path": "book.jpg",
+      "origin": "paddleocr",
+      "use": "spotting task: photographed book spread",
+      "expect": [
+        "Veronica"
+      ],
+      "sha256": "782cc71a2730020ea8da815de3e40a964b7f150c183d1f8c01dd211de9dcbcc4"
+    },
+    {
+      "path": "seal.png",
+      "origin": "paddleocr",
+      "use": "seal task: round red company seal",
+      "expect": [
+        "发票专用章"
+      ],
+      "sha256": "be29cb91999450742958c62ead08f93825b92e5fa4290c063cc7991259da6c24"
+    },
+    {
+      "path": "doc_with_formula.png",
+      "origin": "paddleocr",
+      "use": "parse: two-column paper page with display formulas",
+      "expect": [
+        "Soltan"
+      ],
+      "sha256": "6b07d28527dc9e930804fa73df562f1a81599c6b8a1a8bbc2a80742fa9f26e80"
+    },
+    {
+      "path": "book_rot180.jpg",
+      "origin": "paddleocr",
+      "use": "parse: page rotated 180 degrees; orientation correction is disabled",
+      "expect": [],
+      "sha256": "6fb6b8ea8836a0acb46762a85d2bcf97100e33f0c4b49dcfc0b97f5955f4e534"
+    },
+    {
+      "path": "textline_rot180.jpg",
+      "origin": "paddleocr",
+      "use": "ocr task: text line rotated 180 degrees; orientation correction is disabled",
+      "expect": [],
+      "sha256": "a642ee32c10f5660d34bd06212a8bfc46ce9f4ea0c09366a510db34f17642127"
+    },
+    {
+      "path": "multiframe.tif",
+      "origin": "generated",
+      "use": "parse splits three frames into pages; ocr rejects them",
+      "expect": [
+        "amber",
+        "cobalt",
+        "violet"
+      ],
+      "sha256": "4bc8c2740322db9ddd136a2682720c550afae2f5cda6fd0670f0defc1bbb5924"
+    },
+    {
+      "path": "sample.docx",
+      "origin": "generated",
+      "use": "parse: Office document converted by LibreOffice",
+      "expect": [
+        "office sample",
+        "Oslo"
+      ],
+      "sha256": "06fed40c1e159fc9c32d25639524e81c62e6ce1bbb91039857f4e892808c9714"
+    },
+    {
+      "path": "long.pdf",
+      "origin": "generated",
+      "use": "parse: 30 pages in at least two blocks for progress and cancellation",
+      "expect": [],
+      "sha256": "c9c2f45f5c5cd548d69b146557a825cfd8b7620ad462cec7d535126233369544"
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: refine-merge-stored-rag
+expected_outcome: |
+  The agent downloads json_rag.json with preview=false for its sha256, then saves one refinement whose first group merges chunks 0 and 1 and whose groups cover every chunk in order.
+context:
+  scaffold_script: setup.sh

@@ -1,0 +1,75 @@
+{
+  "$comment": "Disposition registry for test-book-e2e.md cases that browser collection alone cannot express. It never maps a case to a test: mappings come from collected Playwright titles, collected node --test titles and the book's own executable column. `owners` name the suite whose cases must hold a marked executable entry. `exclusions` need a written reason of at least 40 characters and fail the gate as soon as the case gains evidence. `ratchet.maxUnassigned` may only be lowered.",
+  "ratchet": { "maxUnassigned": 0 },
+  "owners": {
+    "frontend-mock": [
+      "SDM-PAR-001", "SDM-PAR-002", "SDM-PAR-003", "SDM-PAR-004", "SDM-PAR-005",
+      "SDM-PAR-006", "SDM-PAR-007", "SDM-PAR-008", "SDM-PAR-009", "SDM-PAR-010",
+      "SDM-PAR-011", "SDM-PAR-012", "SDM-PAR-013", "SDM-PAR-014", "SDM-PAR-015",
+      "SDM-PAR-016", "SDM-PAR-020", "SDM-PAR-021", "SDM-PAR-022", "SDM-PAR-023",
+      "SDM-PAR-024", "SDM-PAR-025",
+      "SDM-OCR-001", "SDM-OCR-002", "SDM-OCR-003", "SDM-OCR-004", "SDM-OCR-005",
+      "SDM-OCR-006", "SDM-OCR-007", "SDM-OCR-008", "SDM-OCR-009",
+      "SDM-RAG-001", "SDM-RAG-002", "SDM-RAG-003", "SDM-RAG-004", "SDM-RAG-005",
+      "SDM-RAG-006", "SDM-RAG-007", "SDM-RAG-008", "SDM-RAG-009", "SDM-RAG-010",
+      "SDM-RAG-011", "SDM-RAG-012", "SDM-RAG-013", "SDM-RAG-014", "SDM-RAG-015",
+      "SDM-RAG-016", "SDM-RAG-020", "SDM-RAG-021", "SDM-RAG-022",
+      "SDM-STO-001", "SDM-STO-002", "SDM-STO-003", "SDM-STO-004", "SDM-STO-005",
+      "SDM-STO-006", "SDM-STO-007", "SDM-STO-008", "SDM-STO-011",
+      "SDM-MON-001", "SDM-MON-002", "SDM-MON-003", "SDM-MON-004", "SDM-MON-005",
+      "SDM-MON-006", "SDM-MON-007", "SDM-MON-008", "SDM-MON-009", "SDM-MON-010",
+      "SDM-MON-011", "SDM-MON-012",
+      "SDM-XUI-001", "SDM-XUI-002", "SDM-XUI-003", "SDM-XUI-004", "SDM-XUI-005",
+      "SDM-XUI-006", "SDM-XUI-007", "SDM-XUI-008", "SDM-XUI-009", "SDM-XUI-010",
+      "SDM-XUI-011", "SDM-XUI-012"
+    ],
+    "frontend-live": [
+      "SDM-PAR-017", "SDM-PAR-018", "SDM-PAR-019", "SDM-PAR-026", "SDM-PAR-027",
+      "SDM-PAR-028", "SDM-PAR-029", "SDM-PAR-030",
+      "SDM-OCR-010", "SDM-OCR-011",
+      "SDM-RAG-017",
+      "SDM-STO-009", "SDM-STO-012",
+      "SDM-MON-013"
+    ],
+    "guides": [
+      "SDM-GUI-001", "SDM-GUI-002", "SDM-GUI-003", "SDM-GUI-004",
+      "SDM-GUI-005", "SDM-GUI-006", "SDM-GUI-007"
+    ],
+    "backend": [
+      "SDM-RAG-019",
+      "SDM-AGT-001",
+      "SDM-API-001", "SDM-API-002", "SDM-API-003", "SDM-API-004",
+      "SDM-API-005", "SDM-API-006", "SDM-API-009", "SDM-API-010"
+    ]
+  },
+  "exclusions": [
+    {
+      "id": "SDM-RAG-018",
+      "reason": "Real /chunk from a saved /parse JSON at maximum document size requires a live stack and a large real corpus; deterministic packing is proven offline by the backend suite and live repair coverage is rag-repair-live."
+    },
+    {
+      "id": "SDM-STO-010",
+      "reason": "Real S3 lifecycle/retention expiry cannot be observed inside a single test run without waiting for bucket expiration; it is an operator verification through verify_storage_live and SeaweedFS config, not a browser case."
+    },
+    {
+      "id": "SDM-AGT-002",
+      "reason": "MCP-live agent workflow requires a running smart-document-mcp server and a real MCP client; it is executed by scripts/verify_mcp_live.py as operator evidence, not by the Playwright suite."
+    },
+    {
+      "id": "SDM-AGT-003",
+      "reason": "Skill-agent workflow requires a real agent host loading the ocr-skill SKILL.md; prompt-side behaviour cannot be asserted by Playwright and is validated by the skill contract tests only."
+    },
+    {
+      "id": "SDM-AGT-004",
+      "reason": "Skill-agent JSON-interpretation workflow requires a real agent host; the smart-document-reader skill rules are enforced by tests/test_smart_document_reader_skill.py, not by browser evidence."
+    },
+    {
+      "id": "SDM-API-007",
+      "reason": "Live stack smoke verification (verify_api_live, verify_rag_smoke, verify_storage_live) is an operator/API-live campaign against a running stack, not a default mock/browser case; evidence is recorded per run."
+    },
+    {
+      "id": "SDM-API-008",
+      "reason": "Live autotune profile proof (verify_autotune_live) requires a completed startup calibration on real GPU hardware and is recorded as operator evidence, never mocked."
+    }
+  ]
+}

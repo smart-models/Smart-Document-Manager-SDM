@@ -1,0 +1,8 @@
+# Derived input: a real /parse of calibration/multipage.pdf
+# with page 3 replaced by the server's page_unprocessed shape.
+schema_version: "1.1"
+name: partial-parse-unprocessed-page
+expected_outcome: |
+  The summary covers pages 1-2 with citations and states that page 3 was not processed, so the document is incomplete.
+context:
+  scaffold_script: place-files.sh

@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: full-extraction-single-inference
+expected_outcome: |
+  One parse of the whole 3-page PDF, then each page's text reported with its page number.
+context:
+  scaffold_script: setup.sh

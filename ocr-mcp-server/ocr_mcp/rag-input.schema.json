@@ -1,0 +1,358 @@
+{
+  "additionalProperties": true,
+  "description": "The reusable structure from /parse; timings are never required.",
+  "properties": {
+    "pages": {
+      "items": {
+        "additionalProperties": true,
+        "description": "Page numbers are checked by the engine for useful domain errors.",
+        "properties": {
+          "page": {
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "title": "Page",
+            "type": "integer"
+          },
+          "width": {
+            "anyOf": [
+              {
+                "maximum": 9007199254740991,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Width"
+          },
+          "height": {
+            "anyOf": [
+              {
+                "maximum": 9007199254740991,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Height"
+          },
+          "blocks": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "description": "Structured input with optional geometry and historical token counts.",
+                  "properties": {
+                    "type": {
+                      "minLength": 1,
+                      "title": "Type",
+                      "type": "string"
+                    },
+                    "content": {
+                      "title": "Content",
+                      "type": "string"
+                    },
+                    "bbox": {
+                      "anyOf": [
+                        {
+                          "items": {
+                            "type": "number"
+                          },
+                          "maxItems": 4,
+                          "minItems": 4,
+                          "type": "array"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "title": "Bbox"
+                    },
+                    "order": {
+                      "anyOf": [
+                        {
+                          "maximum": 9007199254740991,
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "title": "Order"
+                    },
+                    "block_id": {
+                      "anyOf": [
+                        {
+                          "maximum": 9007199254740991,
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "title": "Block Id"
+                    },
+                    "group_id": {
+                      "anyOf": [
+                        {
+                          "maximum": 9007199254740991,
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "title": "Group Id"
+                    },
+                    "global_block_id": {
+                      "anyOf": [
+                        {
+                          "maximum": 9007199254740991,
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "title": "Global Block Id"
+                    },
+                    "global_group_id": {
+                      "anyOf": [
+                        {
+                          "maximum": 9007199254740991,
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "title": "Global Group Id"
+                    },
+                    "polygon": {
+                      "anyOf": [
+                        {
+                          "items": {
+                            "items": {
+                              "type": "number"
+                            },
+                            "maxItems": 2,
+                            "minItems": 2,
+                            "type": "array"
+                          },
+                          "minItems": 3,
+                          "type": "array"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "title": "Polygon"
+                    },
+                    "content_tokens": {
+                      "anyOf": [
+                        {
+                          "maximum": 9007199254740991,
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "default": null,
+                      "title": "Content Tokens"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "content"
+                  ],
+                  "title": "ChunkBlock",
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Blocks"
+          },
+          "markdown": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Markdown"
+          },
+          "images": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Images"
+          },
+          "image_names": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Image Names"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Error"
+          }
+        },
+        "required": [
+          "page"
+        ],
+        "title": "ChunkPage",
+        "type": "object"
+      },
+      "title": "Pages",
+      "type": "array"
+    },
+    "warnings": {
+      "items": {
+        "description": "Describe a recoverable condition with optional target and diagnostic details.",
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "severity": {
+            "default": "warning",
+            "title": "Severity",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "target": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Target"
+          },
+          "details": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Details"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "ApiWarning",
+        "type": "object"
+      },
+      "title": "Warnings",
+      "type": "array"
+    },
+    "usage": {
+      "anyOf": [
+        {
+          "description": "Tokens of parsed block content; not model inference usage.",
+          "properties": {
+            "tokenizer": {
+              "description": "Model repository and revision used.",
+              "title": "Tokenizer",
+              "type": "string"
+            },
+            "content_tokens": {
+              "description": "Sum of block content tokens.",
+              "title": "Content Tokens",
+              "type": "integer"
+            },
+            "blocks": {
+              "description": "Blocks covered (empty blocks add 0).",
+              "title": "Blocks",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "tokenizer",
+            "content_tokens",
+            "blocks"
+          ],
+          "title": "TokenUsage",
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    }
+  },
+  "required": [
+    "pages"
+  ],
+  "title": "ParsedDocument",
+  "type": "object"
+}

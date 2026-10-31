@@ -1,0 +1,214 @@
+"""Storage failures and indexed listing, with isolated S3 fakes."""
+
+import asyncio
+
+import httpx
+import pytest
+from fastapi import HTTPException
+
+from ocr_server import create_app
+from ocrserver.storage_browser import StorageBrowser
+from ocrserver.storage_index import (
+    INDEX_ENTRIES,
+    INDEX_READY,
+    index_key,
+    index_archive,
+    rebuild_index,
+)
+from test_mcp_schema import FakePipeline, FakeRecognizer
+from test_storage_browser import MemoryS3, configured
+
+
+async def test_partial_deletion_cannot_produce_a_successful_incomplete_zip():
+    s3 = MemoryS3()
+    prefix = s3.archive(1)
+    browser = StorageBrowser(configured(), client=s3)
+    s3.delete_errors.add(prefix + "document.md")
+    with pytest.raises(HTTPException) as caught:
+        await browser.delete(prefix, f"{1:032x}")
+    assert caught.value.detail["code"] == "storage_delete_partial"
+    with pytest.raises(HTTPException) as caught:
+        await browser.archive_zip(prefix)
+    assert caught.value.status_code == 409
+    assert caught.value.detail["code"] == "storage_archive_incomplete"
+    assert prefix + "manifest.json" in s3.objects
+    assert not browser._downloads
+    s3.delete_errors.clear()
+    assert (await browser.delete(prefix, f"{1:032x}"))["deleted_objects"] == 2
+    await browser.close()
+
+
+async def test_disappearing_file_during_zip_is_an_incomplete_archive():
+    class VanishingS3(MemoryS3):
+        def get_object(self, **kwargs):
+            if kwargs["Key"].endswith("document.md"):
+                self.objects.pop(kwargs["Key"], None)
+            return super().get_object(**kwargs)
+
+    s3 = VanishingS3()
+    prefix = s3.archive(1)
+    browser = StorageBrowser(configured(), client=s3)
+    with pytest.raises(HTTPException) as caught:
+        await browser.archive_zip(prefix)
+    assert caught.value.status_code == 409
+    assert not browser._downloads
+    await browser.close()
+
+
+@pytest.mark.parametrize("path", ["/storage/archive", "/storage/file"])
+async def test_slow_confirmation_times_out_before_any_s3_operation(monkeypatch, path):
+    monkeypatch.setattr("ocrserver.storage_browser.IO_TIMEOUT_SECONDS", 0.02)
+    s3 = MemoryS3()
+    prefix = s3.archive(1)
+    browser = StorageBrowser(configured(), client=s3)
+    app = create_app(
+        configured(), FakePipeline(), FakeRecognizer(), storage_browser=browser
+    )
+
+    release = asyncio.Event()
+
+    async def slow():
+        yield b'{"confirm":"'
+        await release.wait()
+        pytest.fail("confirmation should stop before EOF")
+
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app), base_url="http://test"
+    ) as client:
+        response = await asyncio.wait_for(
+            client.request(
+                "DELETE",
+                path,
+                params={"prefix": prefix, "key": prefix + "document.md"},
+                content=slow(),
+            ),
+            1,
+        )
+    assert response.status_code == 504
+    assert response.json()["detail"]["code"] == "storage_confirmation_timeout"
+    assert not s3.calls
+    assert len(s3.objects) == 3
+    await browser.close()
+
+
+def test_index_sorts_like_existing_timestamp_and_prefix_order():
+    from ocrserver.storage_index import sort_stamp
+
+    prefixes = [
+        "a.pdf__20260926T120000000000Z__Abcd123_/",
+        "b.pdf__20260926T120000000000Z__Abcd123_/",
+        "a.pdf__20260927T120000000000Z__Abcd123_/",
+        f"parse/2026/09/26/{1:032x}/",
+    ]
+    prefixes.append("a" * 96 + "__20260926T120000000000Z__Abcd123_/")
+    assert all(
+        len(component) <= 255
+        for prefix in prefixes
+        for component in index_key(prefix).split("/")
+    )
+    expected = sorted(prefixes, key=lambda p: (sort_stamp(p), p), reverse=True)
+    assert [index_archive(key) for key in sorted(map(index_key, prefixes))] == expected
+    with pytest.raises(ValueError):
+        index_archive(INDEX_ENTRIES + "bad")
+
+
+async def test_index_backfill_preserves_all_layouts_and_newest_first_pagination():
+    s3 = MemoryS3()
+    prefixes = [s3.archive(1), s3.archive(2, "ocr"), s3.current_archive()]
+    # Orphan/incomplete archives also remain addressable after migration.
+    incomplete = "abandoned.pdf__20260925T120000000000Z__Dead123_/"
+    s3.objects[incomplete + "document.md"] = b"abandoned"
+    assert rebuild_index(s3, "ocr-outputs") == 4
+    assert rebuild_index(s3, "ocr-outputs") == 4
+    browser = StorageBrowser(configured(), client=s3)
+    found, cursor = [], None
+    while True:
+        page = await browser.archives(limit=1, cursor=cursor)
+        found.extend(item["prefix"] for item in page["items"])
+        cursor = page["next_cursor"]
+        if not cursor:
+            break
+    assert found == [prefixes[2], prefixes[0], prefixes[1], incomplete]
+    assert (await browser.archives(kind="ocr"))["items"][0]["prefix"] == prefixes[1]
+    await browser.close()
+
+
+async def test_indexed_day_does_not_scan_50001_other_archives():
+    s3 = MemoryS3()
+    target = s3.current_archive()
+    s3.objects[INDEX_READY] = b"1"
+    s3.objects[index_key(target)] = b""
+    for i in range(50001):
+        prefix = f"old{i}.pdf__20260925T120000000000Z__Abcd123_/"
+        s3.objects[index_key(prefix)] = b""
+    browser = StorageBrowser(configured(), client=s3)
+    response = await browser.archives(date_from="2026-09-26", date_to="2026-09-26")
+    assert [r["prefix"] for r in response["items"]] == [target]
+    assert (
+        len([c for op, c in s3.calls if op == "list" and c["Prefix"] == INDEX_ENTRIES])
+        == 1
+    )
+    empty = await browser.archives(date_from="2026-10-11", date_to="2026-10-11")
+    assert empty["items"] == [] and empty["next_cursor"] is None
+    await browser.close()
+
+
+async def test_indexed_unfiltered_pages_do_not_scan_all_entries_and_skip_retention():
+    s3 = MemoryS3()
+    prefixes = [s3.archive(i) for i in range(1, 4)]
+    rebuild_index(s3, "ocr-outputs")
+    # Simulate retention removing an entire archive, leaving its index entry.
+    for key in list(s3.objects):
+        if key.startswith(prefixes[2]):
+            del s3.objects[key]
+    browser = StorageBrowser(configured(), client=s3)
+    first = await browser.archives(limit=1)
+    assert first["items"][0]["prefix"] == prefixes[1]
+    second = await browser.archives(limit=1, cursor=first["next_cursor"])
+    assert second["items"][0]["prefix"] == prefixes[0]
+    assert second["next_cursor"] is None
+    await browser.close()
+
+
+def test_failed_backfill_does_not_publish_readiness():
+    class Failing(MemoryS3):
+        def put_object(self, **kwargs):
+            if kwargs["Key"].startswith(INDEX_ENTRIES):
+                raise RuntimeError("failed")
+            return super().put_object(**kwargs)
+
+    s3 = Failing()
+    s3.archive(1)
+    with pytest.raises(RuntimeError):
+        rebuild_index(s3, "ocr-outputs")
+    assert INDEX_READY not in s3.objects
+
+
+def test_backfill_streams_across_listing_boundaries_without_losing_prefixes():
+    s3 = MemoryS3()
+    prefixes = [s3.archive(i) for i in range(1, 401)]
+    assert rebuild_index(s3, "ocr-outputs") == len(prefixes)
+    assert {
+        index_archive(key) for key in s3.objects if key.startswith(INDEX_ENTRIES)
+    } == set(prefixes)
+
+
+async def test_index_failure_happens_before_archive_reservation():
+    from ocrserver.storage import ArtifactStore, ArtifactCapture
+    from ocrserver.schemas import OcrResponse
+
+    class Failing(MemoryS3):
+        def put_object(self, **kwargs):
+            if kwargs["Key"].startswith(INDEX_ENTRIES):
+                raise RuntimeError("index unavailable")
+            return super().put_object(**kwargs)
+
+    s3 = Failing()
+    store = ArtifactStore(configured(), client=s3)
+    result = await store.save(
+        ArtifactCapture("ocr", configured()),
+        OcrResponse(result="text", task="ocr", processing_time_ms=1),
+    )
+    assert result.status == "failed"
+    assert not s3.objects
+    await store.close()

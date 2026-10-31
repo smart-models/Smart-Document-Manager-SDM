@@ -1,0 +1,13 @@
+# syntax=docker/dockerfile:1.7
+FROM vllm/vllm-openai:v0.32.0@sha256:befccf0e7e4089aa23926bb6f887a85c0d46c2a99e6de5c5ffdf5cb7957c5b34
+
+# Repository/Launchpad administration is unnecessary in the model server.
+RUN apt-get purge -y python3-apt python3-httplib2 python3-oauthlib \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements/vllm-security.txt /tmp/vllm-security.txt
+# Unused future exporters conflict with LMCache's supported telemetry stack.
+RUN python3 -m pip uninstall -y opentelemetry-exporter-otlp-common opentelemetry-exporter-http-transport \
+    && python3 -m pip install --no-cache-dir -r /tmp/vllm-security.txt \
+    && python3 -m pip check \
+    && rm /tmp/vllm-security.txt

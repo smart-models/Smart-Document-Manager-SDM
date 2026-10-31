@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: refine-optimize-stored-rag-autonomously
+expected_outcome: |
+  The agent downloads json_rag.json with preview=false, builds the grouping itself from the chunks' token counts inside the page and structure boundaries, cuts any group above 512 tokens with ocr_split_rag_group and copies the returned entries, keeps whole any table a preview would split, merges below-range groups where a neighbour fits, saves one refinement whose groups cover every chunk in order without asking the user about individual cuts or merges, and reports the saved file with the groups still outside the range.
+context:
+  scaffold_script: setup.sh

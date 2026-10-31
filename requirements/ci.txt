@@ -1,0 +1,4 @@
+# Lightweight API/MCP tests without Paddle or GPU wheels.
+# The API Uvicorn pin is intentionally excluded: MCP runs in its own image.
+-r test.txt
+-r dev.txt

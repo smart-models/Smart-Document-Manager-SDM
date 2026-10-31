@@ -1,0 +1,182 @@
+{
+ "prefix": "annual-sustainability-report-2025.pdf__20261029T210624662830Z__Rpt85pgA/",
+ "manifest": {
+  "archive_schema_version": 1,
+  "complete": true,
+  "kind": "parse",
+  "endpoint": "/parse",
+  "job_id": "Rpt85pgA",
+  "created_at": "2026-10-29T21:06:24.860469+00:00",
+  "source": {
+   "sha256": "845e91831319e89c4d656bdb80c278ac09a7230d61e5dfd2e1b1fbb436ac8917",
+   "size": 16440125,
+   "content_type": "application/pdf",
+   "extension": "pdf",
+   "original_name": "annual-sustainability-report-2025.pdf"
+  },
+  "requested": {
+   "output": "both",
+   "max_pages": "300",
+   "dpi": null,
+   "table_format": "markdown",
+   "include_images": true,
+   "json_rag": true,
+   "filename": "annual-sustainability-report-2025.pdf"
+  },
+  "effective": {
+   "output": "both",
+   "max_pages": 300,
+   "table_format": "markdown",
+   "include_images": true,
+   "json_rag": true,
+   "dpi": 250
+  },
+  "model_name": "PaddlePaddle/PaddleOCR-VL-1.6",
+  "model_revision": "c5630abae1d940eafe0697512a0325494b02ab42",
+  "served_model": "PaddleOCR-VL-0.9B",
+  "pipeline_version": "v1.6",
+  "application_version": "1.0.0",
+  "chunker_version": null,
+  "processing_time_ms": 189533.59,
+  "timings": {
+   "ocr_time_ms": 189533.59
+  },
+  "warnings": [
+   {
+    "code": "tables_spans_expanded",
+    "severity": "info",
+    "message": "4 table(s) had merged cells (rowspan/colspan) expanded into repeated values for pipe markdown.",
+    "target": {
+     "field": "table_format"
+    },
+    "details": null
+   }
+  ],
+  "archive_warnings": [],
+  "partial_ocr": false,
+  "unprocessed_pages": [],
+  "images": [
+   {
+    "page": 1,
+    "original_name": "imgs/img_in_header_image_box_193_195_494_488.jpg",
+    "path": "images/p0001-0001.png"
+   },
+   {
+    "page": 16,
+    "original_name": "imgs/img_in_image_box_398_446_1813_749.jpg",
+    "path": "images/p0016-0001.png"
+   },
+   {
+    "page": 34,
+    "original_name": "imgs/img_in_chart_box_519_353_1671_1073.jpg",
+    "path": "images/p0034-0001.png"
+   },
+   {
+    "page": 53,
+    "original_name": "imgs/img_in_chart_box_269_432_974_1132.jpg",
+    "path": "images/p0053-0001.png"
+   },
+   {
+    "page": 53,
+    "original_name": "imgs/img_in_chart_box_993_432_1691_1130.jpg",
+    "path": "images/p0053-0002.png"
+   },
+   {
+    "page": 69,
+    "original_name": "imgs/img_in_image_box_251_614_1690_1959.jpg",
+    "path": "images/p0069-0001.png"
+   },
+   {
+    "page": 85,
+    "original_name": "imgs/img_in_chart_box_387_337_1563_1204.jpg",
+    "path": "images/p0085-0001.png"
+   }
+  ]
+ },
+ "files": [
+  {
+   "key": "annual-sustainability-report-2025.pdf__20261029T210624662830Z__Rpt85pgA/document.md",
+   "name": "document.md",
+   "size": 185729,
+   "content_type": "text/plain; charset=utf-8",
+   "sha256": "21262a3cb5337627b0fad9d891c16adb40706bd3e57534416dd02bbe5917d184"
+  },
+  {
+   "key": "annual-sustainability-report-2025.pdf__20261029T210624662830Z__Rpt85pgA/images/p0001-0001.png",
+   "name": "images/p0001-0001.png",
+   "size": 65423,
+   "content_type": "image/png",
+   "sha256": "5722dd80a15cc9704fa73b3d3592dcd8bee51c3d10b2469921e25fc4124b2bcc"
+  },
+  {
+   "key": "annual-sustainability-report-2025.pdf__20261029T210624662830Z__Rpt85pgA/images/p0016-0001.png",
+   "name": "images/p0016-0001.png",
+   "size": 166000,
+   "content_type": "image/png",
+   "sha256": "7aba97924eaaaf4941de3883f6bb822554836de284442b43dbc264b6e3c25ff8"
+  },
+  {
+   "key": "annual-sustainability-report-2025.pdf__20261029T210624662830Z__Rpt85pgA/images/p0034-0001.png",
+   "name": "images/p0034-0001.png",
+   "size": 409979,
+   "content_type": "image/png",
+   "sha256": "52cf422ca808261e19dc9d380448b023eb59ba1e33d7a772e85c6971087dc4fe"
+  },
+  {
+   "key": "annual-sustainability-report-2025.pdf__20261029T210624662830Z__Rpt85pgA/images/p0053-0001.png",
+   "name": "images/p0053-0001.png",
+   "size": 154057,
+   "content_type": "image/png",
+   "sha256": "0ab35faed9bfab6763b9bd26d9e521a8591a53715845f0ff470fa89012229b7f"
+  },
+  {
+   "key": "annual-sustainability-report-2025.pdf__20261029T210624662830Z__Rpt85pgA/images/p0053-0002.png",
+   "name": "images/p0053-0002.png",
+   "size": 153889,
+   "content_type": "image/png",
+   "sha256": "78f431b23fa473c9cd2329b1185f16f38406f05079bd49c27a01b6d5793bc6e6"
+  },
+  {
+   "key": "annual-sustainability-report-2025.pdf__20261029T210624662830Z__Rpt85pgA/images/p0069-0001.png",
+   "name": "images/p0069-0001.png",
+   "size": 2656710,
+   "content_type": "image/png",
+   "sha256": "100337ea193b8585d1763d0d8575db8a16bf365b96216729786a946723ac29d0"
+  },
+  {
+   "key": "annual-sustainability-report-2025.pdf__20261029T210624662830Z__Rpt85pgA/images/p0085-0001.png",
+   "name": "images/p0085-0001.png",
+   "size": 77840,
+   "content_type": "image/png",
+   "sha256": "3ef7aeda2086147c21729b9bbb435f1e298e01bbccf183cbbfc97ced6d2e6c49"
+  },
+  {
+   "key": "annual-sustainability-report-2025.pdf__20261029T210624662830Z__Rpt85pgA/input.pdf",
+   "name": "input.pdf",
+   "size": 16440125,
+   "content_type": "application/pdf",
+   "sha256": "845e91831319e89c4d656bdb80c278ac09a7230d61e5dfd2e1b1fbb436ac8917"
+  },
+  {
+   "key": "annual-sustainability-report-2025.pdf__20261029T210624662830Z__Rpt85pgA/json_ocr.json",
+   "name": "json_ocr.json",
+   "size": 648137,
+   "content_type": "application/json",
+   "sha256": "1541eb3e8db587c701aef2b148933e3581f89a91b4142ec2e422675e01ed2efd"
+  },
+  {
+   "key": "annual-sustainability-report-2025.pdf__20261029T210624662830Z__Rpt85pgA/json_rag.json",
+   "name": "json_rag.json",
+   "size": 303170,
+   "content_type": "application/json",
+   "sha256": "a3e690053061793bb12ad4c32aace5856f57f1694d3608df1379d240ce1bbc5b"
+  },
+  {
+   "key": "annual-sustainability-report-2025.pdf__20261029T210624662830Z__Rpt85pgA/manifest.json",
+   "name": "manifest.json",
+   "size": 5610,
+   "content_type": "application/json",
+   "sha256": null
+  }
+ ]
+}

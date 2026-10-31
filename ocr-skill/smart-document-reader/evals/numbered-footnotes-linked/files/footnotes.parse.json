@@ -1,0 +1,263 @@
+{
+ "pages": [
+  {
+   "page": 1,
+   "width": 1240,
+   "height": 1754,
+   "markdown": "## Regional Water Report\n\nRainfall in the northern basin rose by twelve percent this year. $ ^{1} $\n\nMost of the increase came from two storms in early spring.\n\nReservoir levels stayed below the ten-year average in August. $ ^{2} $\n\nEngineers expect normal levels again before the winter season.",
+   "blocks": [
+    {
+     "type": "paragraph_title",
+     "bbox": [
+      105.0,
+      121.0,
+      561.0,
+      172.0
+     ],
+     "content": "Regional Water Report",
+     "order": 1,
+     "block_id": 0,
+     "group_id": 0,
+     "global_block_id": null,
+     "global_group_id": null,
+     "polygon": [
+      [
+       105.0,
+       121.0
+      ],
+      [
+       561.0,
+       121.0
+      ],
+      [
+       561.0,
+       172.0
+      ],
+      [
+       105.0,
+       172.0
+      ]
+     ],
+     "content_tokens": 4
+    },
+    {
+     "type": "text",
+     "bbox": [
+      102.0,
+      239.0,
+      950.0,
+      278.0
+     ],
+     "content": "Rainfall in the northern basin rose by twelve percent this year. $ ^{1} $",
+     "order": 2,
+     "block_id": 1,
+     "group_id": 1,
+     "global_block_id": null,
+     "global_group_id": null,
+     "polygon": [
+      [
+       102.0,
+       239.0
+      ],
+      [
+       950.0,
+       239.0
+      ],
+      [
+       950.0,
+       278.0
+      ],
+      [
+       102.0,
+       278.0
+      ]
+     ],
+     "content_tokens": 18
+    },
+    {
+     "type": "text",
+     "bbox": [
+      103.0,
+      296.0,
+      894.0,
+      335.0
+     ],
+     "content": "Most of the increase came from two storms in early spring.",
+     "order": 3,
+     "block_id": 2,
+     "group_id": 2,
+     "global_block_id": null,
+     "global_group_id": null,
+     "polygon": [
+      [
+       103.0,
+       296.0
+      ],
+      [
+       894.0,
+       296.0
+      ],
+      [
+       894.0,
+       335.0
+      ],
+      [
+       103.0,
+       335.0
+      ]
+     ],
+     "content_tokens": 13
+    },
+    {
+     "type": "text",
+     "bbox": [
+      103.0,
+      351.0,
+      957.0,
+      390.0
+     ],
+     "content": "Reservoir levels stayed below the ten-year average in August. $ ^{2} $",
+     "order": 4,
+     "block_id": 3,
+     "group_id": 3,
+     "global_block_id": null,
+     "global_group_id": null,
+     "polygon": [
+      [
+       103.0,
+       351.0
+      ],
+      [
+       957.0,
+       351.0
+      ],
+      [
+       957.0,
+       390.0
+      ],
+      [
+       103.0,
+       390.0
+      ]
+     ],
+     "content_tokens": 19
+    },
+    {
+     "type": "text",
+     "bbox": [
+      104.0,
+      409.0,
+      964.0,
+      446.0
+     ],
+     "content": "Engineers expect normal levels again before the winter season.",
+     "order": 5,
+     "block_id": 4,
+     "group_id": 4,
+     "global_block_id": null,
+     "global_group_id": null,
+     "polygon": [
+      [
+       104.0,
+       409.0
+      ],
+      [
+       964.0,
+       409.0
+      ],
+      [
+       964.0,
+       446.0
+      ],
+      [
+       104.0,
+       446.0
+      ]
+     ],
+     "content_tokens": 11
+    },
+    {
+     "type": "footnote",
+     "bbox": [
+      104.0,
+      1543.0,
+      760.0,
+      1576.0
+     ],
+     "content": "1. Measured at the Lake Arden gauge, January to December.",
+     "order": null,
+     "block_id": 5,
+     "group_id": 5,
+     "global_block_id": null,
+     "global_group_id": null,
+     "polygon": [
+      [
+       104.0,
+       1543.0
+      ],
+      [
+       760.0,
+       1543.0
+      ],
+      [
+       760.0,
+       1576.0
+      ],
+      [
+       104.0,
+       1576.0
+      ]
+     ],
+     "content_tokens": 15
+    },
+    {
+     "type": "footnote",
+     "bbox": [
+      103.0,
+      1583.0,
+      652.0,
+      1615.0
+     ],
+     "content": "2. Average computed over the years 2014 to 2023.",
+     "order": null,
+     "block_id": 6,
+     "group_id": 6,
+     "global_block_id": null,
+     "global_group_id": null,
+     "polygon": [
+      [
+       103.0,
+       1583.0
+      ],
+      [
+       652.0,
+       1583.0
+      ],
+      [
+       652.0,
+       1615.0
+      ],
+      [
+       103.0,
+       1615.0
+      ]
+     ],
+     "content_tokens": 19
+    }
+   ],
+   "images": null,
+   "image_names": null,
+   "error": null
+  }
+ ],
+ "model_name": "PaddlePaddle/PaddleOCR-VL-1.6",
+ "pipeline_version": "v1.6",
+ "processing_time_ms": 5089.565964997746,
+ "warnings": [],
+ "usage": {
+  "tokenizer": "PaddlePaddle/PaddleOCR-VL-1.6@c5630abae1d940eafe0697512a0325494b02ab42",
+  "content_tokens": 99,
+  "blocks": 7
+ },
+ "json_rag": null
+}

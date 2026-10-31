@@ -1,0 +1,128 @@
+{
+ "pages": [
+  {
+   "page": 1,
+   "width": 2000,
+   "height": 2500,
+   "markdown": "Page one content",
+   "blocks": [
+    {
+     "type": "text",
+     "bbox": [
+      95.0,
+      1249.0,
+      311.0,
+      1283.0
+     ],
+     "content": "Page one content",
+     "order": 1,
+     "block_id": 0,
+     "group_id": 0,
+     "global_block_id": null,
+     "global_group_id": null,
+     "polygon": [
+      [
+       95.0,
+       1249.0
+      ],
+      [
+       311.0,
+       1249.0
+      ],
+      [
+       311.0,
+       1283.0
+      ],
+      [
+       95.0,
+       1283.0
+      ]
+     ],
+     "content_tokens": 3
+    }
+   ],
+   "images": null,
+   "image_names": null,
+   "error": null
+  },
+  {
+   "page": 2,
+   "width": 2000,
+   "height": 2500,
+   "markdown": "Page two content",
+   "blocks": [
+    {
+     "type": "text",
+     "bbox": [
+      95.0,
+      1249.0,
+      306.0,
+      1283.0
+     ],
+     "content": "Page two content",
+     "order": 1,
+     "block_id": 0,
+     "group_id": 0,
+     "global_block_id": null,
+     "global_group_id": null,
+     "polygon": [
+      [
+       95.0,
+       1249.0
+      ],
+      [
+       306.0,
+       1249.0
+      ],
+      [
+       306.0,
+       1283.0
+      ],
+      [
+       95.0,
+       1283.0
+      ]
+     ],
+     "content_tokens": 3
+    }
+   ],
+   "images": null,
+   "image_names": null,
+   "error": null
+  },
+  {
+   "page": 3,
+   "width": null,
+   "height": null,
+   "markdown": null,
+   "blocks": null,
+   "images": null,
+   "image_names": null,
+   "error": "page_unprocessed: request time budget exhausted"
+  }
+ ],
+ "model_name": "PaddlePaddle/PaddleOCR-VL-1.6",
+ "pipeline_version": "v1.6",
+ "processing_time_ms": 8942.76678992901,
+ "warnings": [
+  {
+   "code": "pages_unprocessed",
+   "severity": "warning",
+   "message": "1 page(s) were not processed before the request ended.",
+   "target": {
+    "field": "file"
+   },
+   "details": {
+    "pages": [
+     3
+    ]
+   }
+  }
+ ],
+ "usage": {
+  "tokenizer": "PaddlePaddle/PaddleOCR-VL-1.6@c5630abae1d940eafe0697512a0325494b02ab42",
+  "content_tokens": 6,
+  "blocks": 2
+ },
+ "json_rag": null
+}

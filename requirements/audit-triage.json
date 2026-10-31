@@ -1,0 +1,16 @@
+[
+  {
+    "lock": "vllm-py312-linux.txt",
+    "sha256": "f1311925803b5a0d750eb36c74aeb7bedbae4803f637372cd398da6c88d37a42",
+    "package": "setuptools",
+    "version": "80.10.2",
+    "advisories": [
+      "GHSA-h35f-9h28-mq5c",
+      "PYSEC-2026-3447"
+    ],
+    "expires": "2026-11-17",
+    "reason": "CVE-2026-59890 affects source-distribution publishing with Unicode-normalizing filesystems. This Linux model server does not build or publish sdists; that operation is absent from its request path. vLLM 0.32.0 requires setuptools <81 on Python 3.12, so installing 83 would break its declared requirements. Review again if the runtime or its build responsibilities change.",
+    "source": "https://github.com/pypa/setuptools/security/advisories/GHSA-h35f-9h28-mq5c",
+    "image_id": "sha256:03b7a4045bc451ee739778c379769ba4f55fa50480e128cba90b85d7c1406021"
+  }
+]

@@ -1,0 +1,93 @@
+# Local configuration and secrets
+.env
+.env.*
+*.env
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+
+# MCP client config: holds a live bearer token for the local MCP server.
+.mcp.json
+
+# Python environments and caches
+.venv/
+.venv-mcp/
+.venv-security/
+venv/
+env/
+__pycache__/
+**/__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.hypothesis/
+.coverage
+coverage.xml
+htmlcov/
+
+# Models and generated caches
+model_cache/
+models/
+**/.cache/
+*.safetensors
+*.pt
+*.pth
+
+# Runtime and generated data
+*.log
+logs/
+# Downloaded benchmark corpora and generated results are reproducible artifacts.
+benchmarks/datasets/
+benchmarks/results/
+benchmarks/vendor/
+benchmarks/.venv*/
+benchmarks/cache/
+# Dedicated local automation evidence; never commit generated logs or SBOMs.
+/ci-evidence/
+/dependency-audit/
+/release-evidence/
+
+# Build and packaging output
+/build/
+/dist/
+ocr-mcp-server/dist/
+*.egg-info/
+tmp/
+temp/
+*.tmp
+
+# Local editor, agent state and working documents
+.scratch/
+.codex/
+.agents/
+.devin/
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+my-superpowers/
+**/superpowers/
+# Everything under the root docs/ is local working material -- agent scratch and
+# PRDs alike. Nothing in it is tracked, no exceptions.
+docs/
+# ocr_mcp ships its teaching/reference documents as real source under
+# resources/docs/ -- the bare docs/ rule above is for local working material,
+# not this shipped content.
+!ocr-mcp-server/ocr_mcp/resources/docs/
+ocr-mcp-server/ocr_mcp/resources/docs/*
+!ocr-mcp-server/ocr_mcp/resources/docs/*.md
+!ocr-mcp-server/ocr_mcp/resources/docs/guide/
+ocr-mcp-server/ocr_mcp/resources/docs/guide/*
+!ocr-mcp-server/ocr_mcp/resources/docs/guide/*.html
+
+# Node / Playwright (frontend unit, mocked browser and guide suites)
+# Any npm install tree, wherever it was run.
+node_modules/
+frontend/test-results/
+frontend/playwright-report/
+test-results/
+playwright-report/
+blob-report/
+.playwright/

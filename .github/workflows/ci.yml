@@ -1,0 +1,358 @@
+# The verification pass AGENTS.md documents, run by a machine instead of by
+# whoever remembered. Every third-party action is pinned to a full commit SHA
+# rather than a tag, which is the only immutable reference GitHub offers, and
+# the workflow token is read-only: nothing here needs to write to the repo.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  PYTHONUTF8: "1"
+  HF_HUB_OFFLINE: "1"
+  TRANSFORMERS_OFFLINE: "1"
+  PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK: "True"
+
+jobs:
+  lint:
+    name: Python, shell and workflow checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: |
+            requirements/*.txt
+            ocr-mcp-server/pyproject.toml
+      - run: python -m pip install -r requirements/ci.txt
+      - name: Python and dependency contract checks
+        run: |
+          mkdir -p ci-evidence
+          (
+            set -e
+            python -m compileall -q ocr_server.py autotune_entrypoint.py ocrserver vllm calibration scripts ocr-mcp-server/ocr_mcp
+            python -m ruff check . --select E9,F63,F7,F82
+            ci_python_files=(
+              scripts/stack_core.py
+              scripts/verify_token_config.py
+              scripts/verify_compose_security.py
+              scripts/configure_storage.py
+              scripts/verify_dependencies.py
+              scripts/security_constraints.py
+              scripts/release_evidence.py
+              scripts/render_dependency_audit_issue.py
+              scripts/verify_dependency_inventory.py
+              tests/stack_support.py
+              tests/test_stack_core.py
+              tests/test_stack_launchers.py
+              tests/test_stack_verifiers.py
+              tests/test_ci_workflow.py
+              tests/test_branding_contract.py
+              tests/test_verify_dependencies.py
+              tests/test_security_constraints.py
+              tests/test_release_evidence.py
+              tests/test_render_dependency_audit_issue.py
+              tests/test_dependency_inventory.py
+              guide/tests/test_guide_links.py
+              guide/tests/test_guide_contract.py
+            )
+            python -m ruff check "${ci_python_files[@]}"
+            python -m ruff format --check "${ci_python_files[@]}"
+            python -m scripts.verify_dependency_inventory
+            python scripts/security_constraints.py
+          ) 2>&1 | tee ci-evidence/lint.log
+      - name: Validate GitHub Actions workflows
+        env:
+          ACTIONLINT_VERSION: "1.7.12"
+          ACTIONLINT_SHA256: "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8"
+        run: |
+          archive="$RUNNER_TEMP/actionlint.tar.gz"
+          curl --fail --silent --show-error --location \
+            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz" \
+            --output "$archive"
+          echo "$ACTIONLINT_SHA256  $archive" | sha256sum --check
+          tar -xzf "$archive" -C "$RUNNER_TEMP" actionlint
+          "$RUNNER_TEMP/actionlint" -color 2>&1 | tee ci-evidence/actionlint.log
+      - name: Check Bash launcher
+        run: shellcheck stack.sh 2>&1 | tee ci-evidence/shellcheck.log
+      - name: Check PowerShell launcher
+        shell: pwsh
+        run: |
+          Install-Module PSScriptAnalyzer -RequiredVersion 1.25.0 -Scope CurrentUser -Force -AcceptLicense
+          Import-Module PSScriptAnalyzer -RequiredVersion 1.25.0 -Force
+          $findings = @(Invoke-ScriptAnalyzer -Path stack.ps1 -Severity Warning,Error)
+          "PSScriptAnalyzer findings: $($findings.Count)" | Tee-Object ci-evidence/psscriptanalyzer.log
+          $findings | Format-Table -AutoSize | Out-String -Width 200 | Tee-Object ci-evidence/psscriptanalyzer.log -Append
+          if ($findings.Count) { throw "PSScriptAnalyzer found $($findings.Count) issue(s)" }
+      - name: Upload check evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ci-lint-${{ github.run_attempt }}
+          path: ci-evidence/
+          if-no-files-found: error
+          retention-days: 14
+
+  unit:
+    name: API, MCP, skills and automation (Python 3.11)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: |
+            requirements/*.txt
+            ocr-mcp-server/pyproject.toml
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install pinned planner dependencies
+        working-directory: frontend
+        run: npm ci --ignore-scripts
+      - name: Require Node for Python/browser planner parity
+        run: node --version
+      - run: python -m pip install -r requirements/ci.txt
+      - name: Offline Python suites
+        run: |
+          mkdir -p ci-evidence
+          python -m pytest tests -q -ra --junitxml=ci-evidence/unit.xml \
+            --ignore=tests/test_stack_core.py --ignore=tests/test_stack_launchers.py \
+            --ignore=tests/test_stack_verifiers.py 2>&1 | tee ci-evidence/unit.log
+      - name: Upload check evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ci-unit-${{ github.run_attempt }}
+          path: ci-evidence/
+          if-no-files-found: error
+          retention-days: 14
+
+  frontend-unit:
+    name: Frontend unit and mocked browser suites (Node 24)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install pinned browser dependencies
+        working-directory: frontend
+        run: npm ci --ignore-scripts
+      - name: Frontend unit suite
+        working-directory: frontend
+        run: |
+          mkdir -p ../ci-evidence
+          npm test 2>&1 | tee ../ci-evidence/frontend-unit.log
+      - name: Install Chromium
+        working-directory: frontend
+        run: npx --no-install playwright install --with-deps chromium
+      - name: Mocked browser suite
+        working-directory: frontend
+        run: npx --no-install playwright test --project=mock --reporter=line 2>&1 | tee ../ci-evidence/frontend-browser.log
+      - name: Upload check evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ci-frontend-${{ github.run_attempt }}
+          path: ci-evidence/
+          if-no-files-found: error
+          retention-days: 14
+
+  guides:
+    name: Offline HTML field guides
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: |
+            requirements/*.txt
+            ocr-mcp-server/pyproject.toml
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: python -m pip install -r requirements/ci.txt
+      - name: Install pinned guide browser dependencies
+        working-directory: frontend
+        run: npm ci --ignore-scripts
+      - name: Install Chromium
+        working-directory: frontend
+        run: npx --no-install playwright install --with-deps chromium
+      - name: Verify offline pages and configuration parity
+        run: |
+          mkdir -p ci-evidence
+          (
+            set -e
+            python -m pytest guide/tests -q --junitxml=ci-evidence/guides.xml
+            cd frontend
+            npx --no-install playwright test --config playwright.guides.config.js --reporter=line
+          ) 2>&1 | tee ci-evidence/guides.log
+      - name: Upload guide evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ci-guides-${{ github.run_attempt }}
+          path: ci-evidence/
+          if-no-files-found: error
+          retention-days: 14
+
+  launchers:
+    name: Bash and PowerShell launcher parity
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: |
+            requirements/*.txt
+            ocr-mcp-server/pyproject.toml
+      - run: python -m pip install -r requirements/ci.txt
+      - name: Require working Bash and PowerShell
+        run: |
+          command -v bash
+          command -v pwsh
+          bash -c 'exit 0'
+          pwsh -NoProfile -Command 'exit 0'
+      - name: Launcher and verifier suites
+        run: |
+          mkdir -p ci-evidence
+          python -m pytest tests/test_stack_core.py tests/test_stack_launchers.py tests/test_stack_verifiers.py \
+            -q -ra --junitxml=ci-evidence/launchers.xml 2>&1 | tee ci-evidence/launchers.log
+      - name: Upload check evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ci-launchers-${{ github.run_attempt }}
+          path: ci-evidence/
+          if-no-files-found: error
+          retention-days: 14
+
+  compose:
+    name: Dockerfiles and Compose security
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: |
+            requirements/*.txt
+            ocr-mcp-server/pyproject.toml
+      - name: Validate Dockerfiles and both Compose profiles
+        run: |
+          mkdir -p ci-evidence
+          (
+            set -e
+            docker build --check --target ocr-api .
+            docker build --check --target ocr-mcp .
+            docker build --check -f Dockerfile.vllm .
+            docker compose --env-file .env.example config --quiet
+            docker compose --env-file .env.example --profile storage config --quiet
+            python scripts/verify_compose_security.py --env-file .env.example
+            bash stack.sh verify --no-mcp --env-file .env.example
+            MCP_API_TOKENS=ci-synthetic-mcp:ci OCR_SERVER_API_TOKENS=ci-synthetic-api:ci UPSTREAM_CLIENT_TOKEN=ci-synthetic-service bash stack.sh verify --env-file .env.example
+          ) 2>&1 | tee ci-evidence/compose.log
+      - name: Upload check evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ci-compose-${{ github.run_attempt }}
+          path: ci-evidence/
+          if-no-files-found: error
+          retention-days: 14
+
+  wheel:
+    name: Installed MCP wheel and stdio discovery
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: |
+            requirements/*.txt
+            ocr-mcp-server/pyproject.toml
+      - run: python -m pip install -r requirements/dev.txt
+      - name: Verify isolated wheel
+        run: |
+          mkdir -p ci-evidence
+          python scripts/verify_mcp_wheel.py --report ci-evidence/mcp-wheel.json \
+            2>&1 | tee ci-evidence/wheel.log
+      - name: Upload check evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ci-wheel-${{ github.run_attempt }}
+          path: ci-evidence/
+          if-no-files-found: error
+          retention-days: 14
+
+  ci:
+    name: CI
+    if: always()
+    needs: [lint, unit, frontend-unit, guides, launchers, compose, wheel]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Report job results
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: printf '%s\n' "$RESULTS"
+      - name: Fail unless every job succeeded
+        if: >-
+          contains(needs.*.result, 'failure') ||
+          contains(needs.*.result, 'cancelled') ||
+          contains(needs.*.result, 'skipped')
+        run: exit 1

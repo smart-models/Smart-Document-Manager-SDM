@@ -1,0 +1,1374 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Personal Smart OCR RAG chunks — normative output v1.1",
+  "description": "Structural schema; semantic invariants and JCS serialization are defined in the PRD.",
+  "type": "object",
+  "properties": {
+    "chunks": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Chunk"
+      },
+      "minItems": 1
+    }
+  },
+  "required": [
+    "chunks"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "Options": {
+      "type": "object",
+      "properties": {
+        "max_tokens": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 32768
+        },
+        "strictly": {
+          "type": "boolean"
+        },
+        "preserve_tables": {
+          "type": "boolean"
+        },
+        "preserve_code_blocks": {
+          "type": "boolean"
+        },
+        "overlap_tokens": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 32767
+        },
+        "marginal_policy": {
+          "enum": [
+            "metadata",
+            "text"
+          ]
+        },
+        "table_header_policy": {
+          "enum": [
+            "declared",
+            "first_row",
+            "none"
+          ]
+        },
+        "metadata_fields": {
+          "type": "array",
+          "items": {"type": "string"},
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "max_tokens",
+        "strictly",
+        "preserve_tables",
+        "preserve_code_blocks",
+        "overlap_tokens",
+        "marginal_policy",
+        "table_header_policy"
+      ],
+      "additionalProperties": false
+    },
+    "Source": {
+      "type": "object",
+      "properties": {
+        "source_key": {
+          "type": "string",
+          "pattern": "^p[1-9][0-9]*:b[0-9]+$"
+        },
+        "page": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "block_index": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "bbox": {
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {
+                "type": "number"
+              },
+              "minItems": 4,
+              "maxItems": 4
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "polygon": {
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "minItems": 3
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "identifiers": {
+          "type": "object",
+          "properties": {
+            "block_id": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "group_id": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "global_block_id": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "global_group_id": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "source_key",
+        "page",
+        "block_index",
+        "type",
+        "bbox",
+        "polygon"
+      ],
+      "additionalProperties": false
+    },
+    "TablePosition": {
+      "type": "object",
+      "properties": {
+        "row": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "column": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "rowspan": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "colspan": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "representation": {
+          "enum": [
+            "html",
+            "markdown",
+            "cells"
+          ]
+        },
+        "header_method": {
+          "enum": [
+            "declared",
+            "first_row",
+            "none"
+          ]
+        }
+      },
+      "required": [
+        "row",
+        "column",
+        "rowspan",
+        "colspan",
+        "representation",
+        "header_method"
+      ],
+      "additionalProperties": false
+    },
+    "SourceSpan": {
+      "type": "object",
+      "properties": {
+        "source_key": {
+          "type": "string",
+          "pattern": "^p[1-9][0-9]*:b[0-9]+$"
+        },
+        "page": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "block_index": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "bbox": {
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {
+                "type": "number"
+              },
+              "minItems": 4,
+              "maxItems": 4
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "polygon": {
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "minItems": 3
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "identifiers": {
+          "type": "object",
+          "properties": {
+            "block_id": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "group_id": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "global_block_id": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "global_group_id": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        },
+        "start": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "end": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "text_start": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "text_end": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "role": {
+          "enum": [
+            "body",
+            "section_title",
+            "table_cell",
+            "code",
+            "formula"
+          ]
+        },
+        "table": {
+          "$ref": "#/$defs/TablePosition"
+        }
+      },
+      "required": [
+        "source_key",
+        "page",
+        "block_index",
+        "type",
+        "bbox",
+        "polygon",
+        "start",
+        "end",
+        "text_start",
+        "text_end",
+        "role"
+      ],
+      "additionalProperties": false
+    },
+    "ContextSpan": {
+      "type": "object",
+      "properties": {
+        "source_key": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^p[1-9][0-9]*:b[0-9]+$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "page": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "block_index": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "type": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "bbox": {
+          "anyOf": [
+            {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "number"
+                  },
+                  "minItems": 4,
+                  "maxItems": 4
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "polygon": {
+          "anyOf": [
+            {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    },
+                    "minItems": 2,
+                    "maxItems": 2
+                  },
+                  "minItems": 3
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "start": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "end": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "text_start": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "text_end": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "role": {
+          "enum": [
+            "section_title",
+            "overlap",
+            "table_header",
+            "separator",
+            "table_coordinates",
+            "code_fence"
+          ]
+        },
+        "table": {
+          "$ref": "#/$defs/TablePosition"
+        }
+      },
+      "required": [
+        "source_key",
+        "page",
+        "block_index",
+        "type",
+        "bbox",
+        "polygon",
+        "start",
+        "end",
+        "text_start",
+        "text_end",
+        "role"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "source_key": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "source_key"
+            ]
+          },
+          "then": {
+            "properties": {
+              "page": {
+                "type": "null"
+              },
+              "block_index": {
+                "type": "null"
+              },
+              "type": {
+                "type": "null"
+              },
+              "bbox": {
+                "type": "null"
+              },
+              "polygon": {
+                "type": "null"
+              },
+              "start": {
+                "type": "null"
+              },
+              "end": {
+                "type": "null"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "source_key": {
+                "type": "string",
+                "pattern": "^p[1-9][0-9]*:b[0-9]+$"
+              },
+              "page": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "block_index": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "type": {
+                "type": "string",
+                "minLength": 1
+              },
+              "start": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "end": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            }
+          }
+        }
+      ]
+    },
+    "Location": {
+      "type": "object",
+      "properties": {
+        "source_key": {
+          "type": "string",
+          "pattern": "^p[1-9][0-9]*:b[0-9]+$"
+        },
+        "start": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "end": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "source_key",
+        "start",
+        "end"
+      ],
+      "additionalProperties": false
+    },
+    "Parameter": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "value": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "name",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "Diagnostic": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "severity": {
+          "enum": [
+            "info",
+            "warning"
+          ]
+        },
+        "targets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Location"
+          }
+        },
+        "parameters": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Parameter"
+          }
+        }
+      },
+      "required": [
+        "code",
+        "severity",
+        "targets",
+        "parameters"
+      ],
+      "additionalProperties": false
+    },
+    "Asset": {
+      "type": "object",
+      "properties": {
+        "source": {
+          "$ref": "#/$defs/Source"
+        },
+        "reference": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sha256": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "relation_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "source",
+        "reference",
+        "sha256",
+        "relation_ids"
+      ],
+      "additionalProperties": false
+    },
+    "Marginal": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/Source"
+        }
+      },
+      "required": [
+        "text",
+        "source"
+      ],
+      "additionalProperties": false
+    },
+    "PageContext": {
+      "type": "object",
+      "properties": {
+        "page": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "headers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Marginal"
+          }
+        },
+        "footers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Marginal"
+          }
+        },
+        "page_labels": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Marginal"
+          }
+        },
+        "marginal_assets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Asset"
+          }
+        }
+      },
+      "required": [
+        "page",
+        "headers",
+        "footers",
+        "page_labels",
+        "marginal_assets"
+      ],
+      "additionalProperties": false
+    },
+    "Relation": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "type": {
+          "enum": [
+            "formula_number",
+            "caption_object",
+            "footnote_reference",
+            "table_continuation",
+            "inline_formula_context"
+          ]
+        },
+        "from": {
+          "$ref": "#/$defs/Location"
+        },
+        "to": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Location"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "method": {
+          "enum": [
+            "explicit",
+            "geometry",
+            "none"
+          ]
+        },
+        "status": {
+          "enum": [
+            "same_chunk",
+            "across_chunks",
+            "cross_section",
+            "unresolved"
+          ]
+        },
+        "candidate_targets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Location"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "from",
+        "to",
+        "method",
+        "status",
+        "candidate_targets"
+      ],
+      "additionalProperties": false
+    },
+    "Section": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9:._-]+$"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "title"
+      ],
+      "additionalProperties": false
+    },
+    "Tokenizer": {
+      "type": "object",
+      "properties": {
+        "repo": {
+          "const": "PaddlePaddle/PaddleOCR-VL-1.6"
+        },
+        "revision": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "library_version": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "repo",
+        "revision",
+        "sha256",
+        "library_version"
+      ],
+      "additionalProperties": false
+    },
+    "Scope": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "enum": [
+            "provided_document",
+            "complete_document",
+            "page_prefix"
+          ]
+        },
+        "origin": {
+          "enum": [
+            "provided_json",
+            "full_parse",
+            "explicit_max_pages",
+            "accepted_upstream_truncation"
+          ]
+        },
+        "selected_pages": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "requested_max_pages": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "total_pages": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "origin",
+        "selected_pages",
+        "requested_max_pages",
+        "total_pages"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "provided_document"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "origin": {
+                "const": "provided_json"
+              },
+              "requested_max_pages": {
+                "type": "null"
+              },
+              "total_pages": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "complete_document"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "origin": {
+                "const": "full_parse"
+              },
+              "total_pages": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "page_prefix"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "origin": {
+                "enum": [
+                  "explicit_max_pages",
+                  "accepted_upstream_truncation"
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    "UnassignedSource": {
+      "type": "object",
+      "properties": {
+        "source": {
+          "$ref": "#/$defs/Source"
+        },
+        "content": {
+          "type": "string"
+        },
+        "reference": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "source",
+        "content",
+        "reference"
+      ],
+      "additionalProperties": false
+    },
+    "DocumentContext": {
+      "type": "object",
+      "properties": {
+        "titles": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "text": {
+                "type": "string"
+              },
+              "source": {
+                "$ref": "#/$defs/Source"
+              }
+            },
+            "required": [
+              "text",
+              "source"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "scope": {
+          "$ref": "#/$defs/Scope"
+        },
+        "chunking_options": {
+          "$ref": "#/$defs/Options"
+        },
+        "order_summary": {
+          "type": "object",
+          "properties": {
+            "pages": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "blocks": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "ranked_blocks": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "missing_ranks": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "conflicting_pages": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "pages",
+            "blocks",
+            "ranked_blocks",
+            "missing_ranks",
+            "conflicting_pages"
+          ],
+          "additionalProperties": false
+        },
+        "algorithm_profile": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "const": "structural-dp-v1.1"
+            },
+            "max_reach": {
+              "const": 128
+            },
+            "max_candidates": {
+              "const": 16
+            },
+            "overlap_candidates": {
+              "const": 16
+            }
+          },
+          "required": [
+            "name",
+            "max_reach",
+            "max_candidates",
+            "overlap_candidates"
+          ],
+          "additionalProperties": false
+        },
+        "unassigned_sources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/UnassignedSource"
+          }
+        },
+        "diagnostics": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Diagnostic"
+          }
+        }
+      },
+      "required": [
+        "titles",
+        "scope",
+        "chunking_options",
+        "order_summary",
+        "algorithm_profile",
+        "unassigned_sources",
+        "diagnostics"
+      ],
+      "additionalProperties": false
+    },
+    "Chunk": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1
+        },
+        "token_count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "page": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "pages": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "section_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9:._-]+$"
+        },
+        "section": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "section_path": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Section"
+          }
+        },
+        "block_types": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "source_spans": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SourceSpan"
+          },
+          "minItems": 1
+        },
+        "context_spans": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ContextSpan"
+          }
+        },
+        "page_context": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/PageContext"
+          }
+        },
+        "assets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Asset"
+          }
+        },
+        "relations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Relation"
+          }
+        },
+        "overflow": {
+          "type": "boolean"
+        },
+        "overflow_tokens": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "overflow_reason": {
+          "enum": [
+            "protected_table",
+            "protected_code"
+          ]
+        },
+        "overlap_token_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "source_fingerprint": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "tokenizer": {
+          "$ref": "#/$defs/Tokenizer"
+        },
+        "chunker_version": {
+          "const": "structural-dp-v1.1"
+        },
+        "policy_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "source_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "lang": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*$"
+        },
+        "diagnostics": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Diagnostic"
+          }
+        },
+        "document_context": {
+          "$ref": "#/$defs/DocumentContext"
+        }
+      },
+      "required": [
+        "id",
+        "text",
+        "token_count"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "required": ["overflow"],
+            "properties": {
+              "overflow": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "overflow_reason"
+            ],
+            "properties": {
+              "overflow_tokens": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "overlap_token_count": {
+                "const": 0
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "overflow_tokens": {
+                "const": 0
+              }
+            },
+            "not": {
+              "required": [
+                "overflow_reason"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  }
+}

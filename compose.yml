@@ -1,0 +1,422 @@
+name: smart-document-manager
+# stack.ps1 / stack.sh read MCP_SERVER_ENABLED (default true) to select MCP.
+# It is a launcher setting, not an environment variable consumed by the API.
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  vllm-paddleocr:
+    # PaddleOCR-VL requires vLLM >= 0.11.1 (official recipe:
+    # docs.vllm.ai/projects/recipes/.../PaddleOCR-VL.html). Older tags reject
+    # the model arch and flags such as --mm-processor-cache-gb.
+    build:
+      context: .
+      dockerfile: Dockerfile.vllm
+    image: ${OCR_VLLM_IMAGE:-ocr-vllm:0.32.0-security}
+    container_name: vllm-paddleocr
+    init: true
+    entrypoint: ["python3", "/app/launcher/stage1_entrypoint.py"]
+    # Host loopback only — exposes vLLM's OpenAI API + Swagger UI at
+    # http://127.0.0.1:8081/docs (internal port stays 8080).
+    ports:
+      - "127.0.0.1:${OCR_VLLM_DOCS_PORT:-8081}:8080"
+    volumes:
+      - vllm-model-cache:/root/.cache/huggingface
+      # Mounted as /app/launcher (not /app/vllm): with /app on PYTHONPATH a
+      # directory named "vllm" shadows the pip-installed vllm package, breaking
+      # the `vllm` console script (from vllm.scripts import main).
+      - ./vllm:/app/launcher:ro
+      - ./ocrserver:/app/ocrserver:ro
+      - ocr-runtime-profile:/app/runtime
+    environment:
+      HF_HOME: /root/.cache/huggingface
+      PYTHONPATH: /app
+      OCR_VLLM_PORT: "8080"
+      OCR_VLLM_GPU_MEM_UTIL: ${OCR_VLLM_GPU_MEM_UTIL:-}
+      OCR_VLLM_MAX_NUM_SEQS: ${OCR_VLLM_MAX_NUM_SEQS:-}
+      OCR_VLLM_ENFORCE_EAGER: ${OCR_VLLM_ENFORCE_EAGER:-}
+      OCR_VLLM_MAX_NUM_BATCHED_TOKENS: ${OCR_VLLM_MAX_NUM_BATCHED_TOKENS:-}
+      OCR_VLLM_SERVED_MODEL_NAME: ${OCR_VLLM_SERVED_MODEL_NAME:-}
+      OCR_VLLM_MAX_MODEL_LEN: ${OCR_VLLM_MAX_MODEL_LEN:-}
+      OCR_VLLM_MM_PROCESSOR_CACHE_GB: ${OCR_VLLM_MM_PROCESSOR_CACHE_GB:-}
+      OCR_VLLM_MODEL_REVISION: ${OCR_VLLM_MODEL_REVISION:-}
+      OCR_VLLM_HARDWARE_FILE: /app/runtime/vllm-hardware.json
+      # Docker Desktop/WSL does not expose CUDA UVA to vLLM's V2 runner.
+      # Keep the compatible V1 runner, with an explicit expert override.
+      VLLM_USE_V2_MODEL_RUNNER: ${OCR_VLLM_USE_V2_MODEL_RUNNER:-0}
+    # Same GPU as ocr-api: the layout VRAM cap assumes the two share it.
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["${OCR_GPU_DEVICE:-0}"]
+              capabilities: [gpu]
+    networks:
+      - ocr-private
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    mem_limit: 32g
+    cpus: 8.0
+    pids_limit: 200
+    restart: unless-stopped
+    stop_grace_period: 35s
+    healthcheck:
+      test:
+        - CMD
+        - python3
+        - -c
+        - "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8080/health',timeout=5).status==200 else 1)"
+      interval: 15s
+      timeout: 10s
+      retries: 3
+      start_period: 600s
+    logging: *default-logging
+
+  ocr-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: ocr-api
+    image: ocr-api:latest
+    container_name: smart-document-manager
+    init: true
+    user: "1000:1000"
+    ports:
+      - "127.0.0.1:${OCR_SERVER_PORT:-8020}:8020"
+    volumes:
+      - ocr-autotune-profile:/app/model_cache/autotune
+      # Read-only view of the vLLM model cache for local content token counts.
+      - vllm-model-cache:/app/model_cache/hf:ro
+      - ocr-paddlex-cache:/home/appuser/.paddlex
+      - ./calibration:/app/calibration:ro
+      - ./frontend/dist:/app/frontend/dist:ro
+      - ocr-runtime-profile:/app/runtime:ro
+    environment:
+      OCR_SERVER_PORT: "8020"
+      OCR_SERVER_API_TOKENS: ${OCR_SERVER_API_TOKENS:-}
+      UPSTREAM_CLIENT_TOKEN: ${UPSTREAM_CLIENT_TOKEN:-}
+      OCR_MAX_QUEUE_SIZE: ${OCR_MAX_QUEUE_SIZE:-16}
+      OCR_ELEMENT_MAX_SLOTS: ${OCR_ELEMENT_MAX_SLOTS:-32}
+      # Shared estimated memory for /ocr decoding, copies and encoded images.
+      OCR_ELEMENT_MEMORY_BYTES: ${OCR_ELEMENT_MEMORY_BYTES:-536870912}
+      OCR_REQUEST_TIMEOUT: ${OCR_REQUEST_TIMEOUT:-600}
+      OCR_PAGE_TIMEOUT: ${OCR_PAGE_TIMEOUT:-120}
+      OCR_PARSE_DPI: ${OCR_PARSE_DPI:-250}
+      MAX_FILE_BYTES: ${MAX_FILE_BYTES:-31457280}
+      OCR_MAX_EMBEDDED_IMAGE_BYTES: ${OCR_MAX_EMBEDDED_IMAGE_BYTES:-20971520}
+      OCR_MAX_PAGES: ${OCR_MAX_PAGES:-50}
+      # Reject a page over this many pixels with 413; DPI and page count stay
+      # unchanged. Pages are then processed in blocks of up to 24 pages.
+      OCR_PDF_MAX_PAGE_PIXELS: ${OCR_PDF_MAX_PAGE_PIXELS:-25000000}
+      OCR_RATE_LIMIT_REQUESTS_PER_MINUTE: ${OCR_RATE_LIMIT_REQUESTS_PER_MINUTE:-3600}
+      OCR_RATE_LIMIT_BURST_SIZE: ${OCR_RATE_LIMIT_BURST_SIZE:-120}
+      OCR_RATE_LIMIT_MAX_CLIENTS: ${OCR_RATE_LIMIT_MAX_CLIENTS:-10000}
+      OCR_RATE_LIMIT_IDLE_SECONDS: ${OCR_RATE_LIMIT_IDLE_SECONDS:-600}
+      EXPOSE_OCR_SWAGGER: ${EXPOSE_OCR_SWAGGER:-true}
+      EXPOSE_FRONTEND: ${EXPOSE_FRONTEND:-true}
+      # Comma-separated browser origins for CORS ("null" for file://, "*" for any).
+      OCR_CORS_ORIGINS: ${OCR_CORS_ORIGINS:-}
+      OCR_VLLM_URL: http://vllm-paddleocr:8080/v1
+      OCR_VLLM_SERVED_MODEL: ${OCR_VLLM_SERVED_MODEL_NAME:-PaddleOCR-VL-0.9B}
+      OCR_VLLM_MODEL_REVISION: ${OCR_VLLM_MODEL_REVISION:-c5630abae1d940eafe0697512a0325494b02ab42}
+      OCR_HF_CACHE_DIR: ${OCR_HF_CACHE_DIR:-/app/model_cache/hf}
+      # Optional RAG CPU work; independent guards, not OCR inference capacity.
+      OCR_CHUNK_MAX_INPUT_BYTES: ${OCR_CHUNK_MAX_INPUT_BYTES:-33554432}
+      OCR_CHUNK_MAX_BLOCKS: ${OCR_CHUNK_MAX_BLOCKS:-20000}
+      OCR_CHUNK_MAX_UNITS: ${OCR_CHUNK_MAX_UNITS:-20000}
+      OCR_CHUNK_MAX_TOKENS: ${OCR_CHUNK_MAX_TOKENS:-32768}
+      OCR_CHUNK_MAX_DP_EDGES: ${OCR_CHUNK_MAX_DP_EDGES:-320000}
+      OCR_CHUNK_MAX_SPLIT_EVALUATIONS: ${OCR_CHUNK_MAX_SPLIT_EVALUATIONS:-100000}
+      OCR_CHUNK_MAX_TOKEN_EVALUATIONS: ${OCR_CHUNK_MAX_TOKEN_EVALUATIONS:-1100000}
+      OCR_CHUNK_MAX_RENDERED_BYTES: ${OCR_CHUNK_MAX_RENDERED_BYTES:-268435456}
+      OCR_CHUNK_MAX_TABLE_CELLS: ${OCR_CHUNK_MAX_TABLE_CELLS:-100000}
+      OCR_CHUNK_MAX_OUTPUT_CHUNKS: ${OCR_CHUNK_MAX_OUTPUT_CHUNKS:-10000}
+      OCR_CHUNK_MAX_OUTPUT_BYTES: ${OCR_CHUNK_MAX_OUTPUT_BYTES:-67108864}
+      OCR_CHUNK_MAX_WORKERS: ${OCR_CHUNK_MAX_WORKERS:-2}
+      OCR_CHUNK_TIMEOUT_SECONDS: ${OCR_CHUNK_TIMEOUT_SECONDS:-120}
+      OCR_CHUNK_QUEUE_WAIT_SECONDS: ${OCR_CHUNK_QUEUE_WAIT_SECONDS:-0.5}
+      # Office/ODF input (.docx .pptx .xlsx .doc .ppt .xls .odt .odp .ods) is
+      # converted to PDF by headless LibreOffice, one document at a time.
+      OCR_OFFICE_ENABLED: ${OCR_OFFICE_ENABLED:-true}
+      # Empty: find soffice/libreoffice on PATH.
+      OCR_SOFFICE_PATH: ${OCR_SOFFICE_PATH:-}
+      OCR_OFFICE_TIMEOUT_SECONDS: ${OCR_OFFICE_TIMEOUT_SECONDS:-120}
+      OCR_VLLM_HARDWARE_FILE: /app/runtime/vllm-hardware.json
+      # full: complete-corpus screening, then repeated validation of contenders.
+      # quick: two complete passes for each VL-concurrency candidate.
+      OCR_AUTOTUNE: ${OCR_AUTOTUNE:-quick}
+      OCR_TUNING_OBJECTIVE: ${OCR_TUNING_OBJECTIVE:-balanced}
+      OCR_AUTOTUNE_FORCE: ${OCR_AUTOTUNE_FORCE:-false}
+      # Admission budget between passes; a running native predictor may overrun.
+      OCR_AUTOTUNE_MAX_SECONDS: ${OCR_AUTOTUNE_MAX_SECONDS:-}
+      OCR_AUTOTUNE_PROFILE: /app/model_cache/autotune/hardware-profile.json
+      OCR_VL_LANES: ${OCR_VL_LANES:-}
+      OCR_PAGE_PARALLELISM: ${OCR_PAGE_PARALLELISM:-}
+      OCR_LAYOUT_THREADS: ${OCR_LAYOUT_THREADS:-}
+      # Paddle VRAM cap for PP-DocLayoutV3 on the GPU shared with vLLM.
+      FLAGS_gpu_memory_limit_mb: ${OCR_LAYOUT_GPU_MEMORY_MB:-3584}
+      OCR_VL_MAX_INFLIGHT: ${OCR_VL_MAX_INFLIGHT:-16}
+      OCR_VLLM_MAX_NUM_SEQS: ${OCR_VLLM_MAX_NUM_SEQS:-16}
+      # Optional S3 output archive: run scripts/configure_storage.py to enable.
+      OCR_STORAGE_ENABLED: ${OCR_STORAGE_ENABLED:-false}
+      OCR_STORAGE_BROWSER_ENABLED: ${OCR_STORAGE_BROWSER_ENABLED:-false}
+      OCR_S3_ENDPOINT: ${OCR_S3_ENDPOINT:-http://storage-gateway:8333}
+      OCR_S3_BUCKET: ${OCR_S3_BUCKET:-ocr-outputs}
+      OCR_S3_ACCESS_KEY: ${OCR_S3_ACCESS_KEY:-}
+      OCR_S3_SECRET_KEY: ${OCR_S3_SECRET_KEY:-}
+      OCR_S3_BROWSER_ACCESS_KEY: ${OCR_S3_BROWSER_ACCESS_KEY:-}
+      OCR_S3_BROWSER_SECRET_KEY: ${OCR_S3_BROWSER_SECRET_KEY:-}
+      OCR_S3_REGION: ${OCR_S3_REGION:-us-east-1}
+      OCR_S3_ADDRESSING_STYLE: ${OCR_S3_ADDRESSING_STYLE:-path}
+      OCR_STORAGE_TIMEOUT_SECONDS: ${OCR_STORAGE_TIMEOUT_SECONDS:-10}
+      OCR_STORAGE_MAX_INFLIGHT: ${OCR_STORAGE_MAX_INFLIGHT:-2}
+      OCR_STORAGE_MAX_BYTES: ${OCR_STORAGE_MAX_BYTES:-134217728}
+      OCR_STORAGE_MAX_OBJECTS: ${OCR_STORAGE_MAX_OBJECTS:-1024}
+      OCR_STORAGE_SAVE_INPUT: ${OCR_STORAGE_SAVE_INPUT:-false}
+      OCR_STORAGE_SAVE_PARSED: ${OCR_STORAGE_SAVE_PARSED:-true}
+    # Layout analysis runs on the GPU (paddlepaddle-gpu cannot start without it).
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["${OCR_GPU_DEVICE:-0}"]
+              capabilities: [gpu]
+    depends_on:
+      vllm-paddleocr:
+        condition: service_healthy
+    networks:
+      - ocr-private
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      # Office conversion stages input, profile and output PDF under /tmp.
+      - /tmp:size=256m,mode=1777
+      - /home/appuser/.cache:size=64m,mode=0700,uid=1000,gid=1000
+    mem_limit: 4g
+    # Rasterization, Office conversion and chunking run on these CPUs.
+    cpus: ${OCR_API_CPUS:-4.0}
+    pids_limit: 200
+    restart: unless-stopped
+    stop_grace_period: 35s
+    healthcheck:
+      test:
+        - CMD
+        - python3
+        - -c
+        - "import json,urllib.request,sys; sys.exit(0 if json.load(urllib.request.urlopen('http://localhost:8020/health',timeout=5)).get('status')=='healthy' else 1)"
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: ${OCR_HEALTH_START_PERIOD:-1500s}
+    logging: *default-logging
+
+  ocr-mcp:
+    container_name: smart-document-mcp
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: ocr-mcp
+    image: personal-smart-ocr-mcp:latest
+    init: true
+    user: "1000:1000"
+    ports:
+      - "127.0.0.1:${MCP_PORT:-8021}:${MCP_PORT:-8021}"
+    environment:
+      MCP_API_TOKENS: ${MCP_API_TOKENS:-}
+      MCP_UPSTREAM_URL: http://ocr-api:8020
+      UPSTREAM_CLIENT_TOKEN: ${UPSTREAM_CLIENT_TOKEN:-}
+      MCP_BIND_HOST: "127.0.0.1"
+      MCP_LISTEN_HOST: "0.0.0.0"
+      MCP_PORT: ${MCP_PORT:-8021}
+      MCP_ALLOW_UNAUTHENTICATED_LOCAL: "false"
+      MCP_ALLOWED_HOSTS: ${MCP_ALLOWED_HOSTS:-}
+      MCP_ALLOWED_ORIGINS: ${MCP_ALLOWED_ORIGINS:-}
+      MCP_HTTP_TIMEOUT: ${MCP_HTTP_TIMEOUT:-660}
+      # RAG parsing plus CPU chunking; limits apply only to the new RAG tool.
+      MCP_CHUNK_HTTP_TIMEOUT: ${MCP_CHUNK_HTTP_TIMEOUT:-780}
+      MCP_CHUNK_MAX_ARGUMENT_BYTES: ${MCP_CHUNK_MAX_ARGUMENT_BYTES:-8388608}
+      MCP_CHUNK_MAX_RESULT_BYTES: ${MCP_CHUNK_MAX_RESULT_BYTES:-8388608}
+      # Total diagnostic GET budget, including retries and backoff (seconds).
+      MCP_DIAGNOSTIC_TIMEOUT: ${MCP_DIAGNOSTIC_TIMEOUT:-5}
+      # Total storage list/detail/download budget; above the API's 120 s download limit.
+      MCP_STORAGE_TIMEOUT: ${MCP_STORAGE_TIMEOUT:-150}
+      MCP_RETRY_ATTEMPTS: ${MCP_RETRY_ATTEMPTS:-3}
+      MCP_RETRY_BACKOFF_SECONDS: ${MCP_RETRY_BACKOFF_SECONDS:-0.5}
+      # No local file access unless roots and matching read-only mounts exist.
+      # Add a Compose override mount, e.g. ./calibration:/inputs:ro, then set /inputs.
+      MCP_INPUT_ROOTS: ${MCP_INPUT_ROOTS:-}
+      MCP_MAX_FILE_BYTES: ${MCP_MAX_FILE_BYTES:-31457280}
+    depends_on:
+      ocr-api:
+        condition: service_healthy
+    networks:
+      - ocr-private
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    mem_limit: 512m
+    pids_limit: 100
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import os,socket; socket.create_connection(('127.0.0.1',int(os.environ.get('MCP_PORT','8021'))),timeout=5).close()"
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    logging: *default-logging
+
+  seaweedfs:
+    profiles: [storage]
+    image: chrislusf/seaweedfs:4.47@sha256:ce9e796f1fe6f06968f4c04bdaf8f678dad9c8acdfef3d244133d71bfa6bf882
+    container_name: document-storage-s3
+    init: true
+    user: "1000:1000"
+    entrypoint: ["/bin/sh", "/etc/ocr-storage/start.sh"]
+    command:
+      - mini
+      - -dir=/data
+      - -ip=127.0.0.1
+      - -ip.bind=0.0.0.0
+      - -webdav=false
+      - -s3.port.iceberg=0
+      - -s3.port.lance=0
+      - -s3.iam.readOnly=false
+      - -s3.autoCreateBucket=false
+      - -s3.allowDeleteBucketNotEmpty=false
+      - -master.telemetry=false
+      - -master.volumeSizeLimitMB=1024
+      - -volume.max=64
+    environment:
+      AWS_ACCESS_KEY_ID: ${OCR_S3_ADMIN_ACCESS_KEY:-}
+      AWS_SECRET_ACCESS_KEY: ${OCR_S3_ADMIN_SECRET_KEY:-}
+      WEED_ADMIN_USER: admin
+      WEED_ADMIN_PASSWORD: ${OCR_SEAWEED_ADMIN_PASSWORD:-}
+      WEED_ADMIN_READONLY_USER: reader
+      WEED_ADMIN_READONLY_PASSWORD: ${OCR_SEAWEED_READER_PASSWORD:-}
+    volumes:
+      - ocr-output-storage:/data
+      - ./storage/start.sh:/etc/ocr-storage/start.sh:ro
+    networks: [ocr-storage-internal]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    mem_limit: 1g
+    cpus: 2.0
+    pids_limit: 150
+    restart: unless-stopped
+    stop_grace_period: 30s
+    healthcheck:
+      test: [CMD-SHELL, "curl -fsS -o /dev/null http://127.0.0.1:9333/cluster/status && curl -fsS -o /dev/null http://127.0.0.1:8888/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    logging: *default-logging
+
+  storage-gateway:
+    profiles: [storage]
+    image: nginx:stable-alpine@sha256:985220252f3863977e468f611ef118ebd01421289dd86ee1ae99cb068c3bce2b
+    container_name: document-storage-gateway
+    init: true
+    user: "101:101"
+    entrypoint: [nginx, -g, "daemon off;"]
+    ports:
+      - "127.0.0.1:${OCR_S3_PORT:-8333}:8333"
+      - "127.0.0.1:${OCR_STORAGE_CONSOLE_PORT:-23646}:23646"
+    volumes:
+      - ./storage/nginx.conf:/etc/nginx/nginx.conf:ro
+    networks: [ocr-private, ocr-storage-internal]
+    depends_on:
+      seaweedfs:
+        condition: service_healthy
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    mem_limit: 64m
+    pids_limit: 50
+    restart: unless-stopped
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, http://127.0.0.1:8334/healthz]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+    logging: *default-logging
+
+  storage-init:
+    profiles: [storage]
+    image: ocr-api:latest
+    container_name: document-storage-init
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: ocr-api
+    init: true
+    user: "1000:1000"
+    command: [python3, -m, storage.bootstrap]
+    environment:
+      OCR_S3_ENDPOINT: http://seaweedfs:8333
+      OCR_S3_BUCKET: ${OCR_S3_BUCKET:-ocr-outputs}
+      OCR_S3_RETENTION_DAYS: ${OCR_S3_RETENTION_DAYS:-30}
+      OCR_S3_ADMIN_ACCESS_KEY: ${OCR_S3_ADMIN_ACCESS_KEY:-}
+      OCR_S3_ADMIN_SECRET_KEY: ${OCR_S3_ADMIN_SECRET_KEY:-}
+      OCR_S3_ACCESS_KEY: ${OCR_S3_ACCESS_KEY:-}
+      OCR_S3_SECRET_KEY: ${OCR_S3_SECRET_KEY:-}
+      OCR_S3_READER_ACCESS_KEY: ${OCR_S3_READER_ACCESS_KEY:-}
+      OCR_S3_READER_SECRET_KEY: ${OCR_S3_READER_SECRET_KEY:-}
+      OCR_S3_BROWSER_ACCESS_KEY: ${OCR_S3_BROWSER_ACCESS_KEY:-}
+      OCR_S3_BROWSER_SECRET_KEY: ${OCR_S3_BROWSER_SECRET_KEY:-}
+    networks: [ocr-storage-internal]
+    depends_on:
+      seaweedfs:
+        condition: service_healthy
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    mem_limit: 256m
+    pids_limit: 50
+    restart: "no"
+    logging: *default-logging
+
+volumes:
+  vllm-model-cache:
+    name: ocr-vllm-model-cache
+  ocr-autotune-profile:
+    name: ocr-autotune-profile
+  ocr-paddlex-cache:
+    name: ocr-paddlex-cache
+  ocr-runtime-profile:
+    name: ocr-runtime-profile
+  ocr-output-storage:
+    name: ocr-output-storage
+
+networks:
+  ocr-storage-internal:
+    name: smart-document-manager-storage
+    internal: true
+  ocr-private:
+    name: smart-document-manager-private
+    driver: bridge

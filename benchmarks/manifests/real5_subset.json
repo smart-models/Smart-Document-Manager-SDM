@@ -1,0 +1,336 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-08-09T10:44:22.951979+00:00",
+  "source": "https://huggingface.co/datasets/PaddlePaddle/Real5-OmniDocBench",
+  "source_revision": "c6428e836c22cc0c10b9dd34d47709f78190478b",
+  "annotation_sha256": "ccf76b4ce34816f1ced9a922451e1d7e6a4b2f9601fe86e6b815825499d50bea",
+  "seed": "personal-smart-ocr-real5-v1",
+  "base_pages": [
+    "notes_f7f010b78016aeebd76e56d9283eb67f_25.jpg",
+    "PPT_ch7_page_142.png",
+    "book_zh_CNASGL082006_extracted_page_50.png",
+    "scihub_ijcac.2012040101.pdf_5.jpg",
+    "newspaper_8076765115f6c402e81c6bfb48139bc2_1.jpg",
+    "magazine_TheEconomist.2024.03.02_page_032.png",
+    "notes_1ba14cb325bc448f7201b20502ecf2b5_57.jpg",
+    "eastmoney_fdae27854b0cffed1364e2a4457189b2a10ad0b058242ee3c8c9ee8993d7f5c0.pdf_1.jpg",
+    "yanbaopptmerge_yanbaoPPT_5345.jpg",
+    "book_en_国外数学教材-非数学专业教材-线性代数-Gilbert Strang—Linear Algebra and Its Applications 4e_0100.png"
+  ],
+  "conditions": {
+    "illumination": "Real5-OmniDocBench-Illumination",
+    "scanning": "Real5-OmniDocBench-Scanning",
+    "screen": "Real5-OmniDocBench-Screen-Photography",
+    "skew": "Real5-OmniDocBench-Skew",
+    "warping": "Real5-OmniDocBench-Warping"
+  },
+  "mappings": [
+    {
+      "condition": "illumination",
+      "source_name": "notes_f7f010b78016aeebd76e56d9283eb67f_25.jpg",
+      "output_name": "illumination__922a498302bf1656.jpg",
+      "remote_path": "Real5-OmniDocBench-Illumination/notes_f7f010b78016aeebd76e56d9283eb67f_25.jpg"
+    },
+    {
+      "condition": "scanning",
+      "source_name": "notes_f7f010b78016aeebd76e56d9283eb67f_25.jpg",
+      "output_name": "scanning__922a498302bf1656.jpg",
+      "remote_path": "Real5-OmniDocBench-Scanning/notes_f7f010b78016aeebd76e56d9283eb67f_25.jpg"
+    },
+    {
+      "condition": "screen",
+      "source_name": "notes_f7f010b78016aeebd76e56d9283eb67f_25.jpg",
+      "output_name": "screen__922a498302bf1656.jpg",
+      "remote_path": "Real5-OmniDocBench-Screen-Photography/notes_f7f010b78016aeebd76e56d9283eb67f_25.jpg"
+    },
+    {
+      "condition": "skew",
+      "source_name": "notes_f7f010b78016aeebd76e56d9283eb67f_25.jpg",
+      "output_name": "skew__922a498302bf1656.jpg",
+      "remote_path": "Real5-OmniDocBench-Skew/notes_f7f010b78016aeebd76e56d9283eb67f_25.jpg"
+    },
+    {
+      "condition": "warping",
+      "source_name": "notes_f7f010b78016aeebd76e56d9283eb67f_25.jpg",
+      "output_name": "warping__922a498302bf1656.jpg",
+      "remote_path": "Real5-OmniDocBench-Warping/notes_f7f010b78016aeebd76e56d9283eb67f_25.jpg"
+    },
+    {
+      "condition": "illumination",
+      "source_name": "PPT_ch7_page_142.png",
+      "output_name": "illumination__d205d8fb91f4e872.png",
+      "remote_path": "Real5-OmniDocBench-Illumination/PPT_ch7_page_142.png"
+    },
+    {
+      "condition": "scanning",
+      "source_name": "PPT_ch7_page_142.png",
+      "output_name": "scanning__d205d8fb91f4e872.png",
+      "remote_path": "Real5-OmniDocBench-Scanning/PPT_ch7_page_142.png"
+    },
+    {
+      "condition": "screen",
+      "source_name": "PPT_ch7_page_142.png",
+      "output_name": "screen__d205d8fb91f4e872.png",
+      "remote_path": "Real5-OmniDocBench-Screen-Photography/PPT_ch7_page_142.png"
+    },
+    {
+      "condition": "skew",
+      "source_name": "PPT_ch7_page_142.png",
+      "output_name": "skew__d205d8fb91f4e872.png",
+      "remote_path": "Real5-OmniDocBench-Skew/PPT_ch7_page_142.png"
+    },
+    {
+      "condition": "warping",
+      "source_name": "PPT_ch7_page_142.png",
+      "output_name": "warping__d205d8fb91f4e872.png",
+      "remote_path": "Real5-OmniDocBench-Warping/PPT_ch7_page_142.png"
+    },
+    {
+      "condition": "illumination",
+      "source_name": "book_zh_CNASGL082006_extracted_page_50.png",
+      "output_name": "illumination__d7e0ebdfb3710b9c.png",
+      "remote_path": "Real5-OmniDocBench-Illumination/book_zh_CNASGL082006_extracted_page_50.png"
+    },
+    {
+      "condition": "scanning",
+      "source_name": "book_zh_CNASGL082006_extracted_page_50.png",
+      "output_name": "scanning__d7e0ebdfb3710b9c.png",
+      "remote_path": "Real5-OmniDocBench-Scanning/book_zh_CNASGL082006_extracted_page_50.png"
+    },
+    {
+      "condition": "screen",
+      "source_name": "book_zh_CNASGL082006_extracted_page_50.png",
+      "output_name": "screen__d7e0ebdfb3710b9c.png",
+      "remote_path": "Real5-OmniDocBench-Screen-Photography/book_zh_CNASGL082006_extracted_page_50.png"
+    },
+    {
+      "condition": "skew",
+      "source_name": "book_zh_CNASGL082006_extracted_page_50.png",
+      "output_name": "skew__d7e0ebdfb3710b9c.png",
+      "remote_path": "Real5-OmniDocBench-Skew/book_zh_CNASGL082006_extracted_page_50.png"
+    },
+    {
+      "condition": "warping",
+      "source_name": "book_zh_CNASGL082006_extracted_page_50.png",
+      "output_name": "warping__d7e0ebdfb3710b9c.png",
+      "remote_path": "Real5-OmniDocBench-Warping/book_zh_CNASGL082006_extracted_page_50.png"
+    },
+    {
+      "condition": "illumination",
+      "source_name": "scihub_ijcac.2012040101.pdf_5.jpg",
+      "output_name": "illumination__f014df28c779e195.jpg",
+      "remote_path": "Real5-OmniDocBench-Illumination/scihub_ijcac.2012040101.pdf_5.jpg"
+    },
+    {
+      "condition": "scanning",
+      "source_name": "scihub_ijcac.2012040101.pdf_5.jpg",
+      "output_name": "scanning__f014df28c779e195.jpg",
+      "remote_path": "Real5-OmniDocBench-Scanning/scihub_ijcac.2012040101.pdf_5.jpg"
+    },
+    {
+      "condition": "screen",
+      "source_name": "scihub_ijcac.2012040101.pdf_5.jpg",
+      "output_name": "screen__f014df28c779e195.jpg",
+      "remote_path": "Real5-OmniDocBench-Screen-Photography/scihub_ijcac.2012040101.pdf_5.jpg"
+    },
+    {
+      "condition": "skew",
+      "source_name": "scihub_ijcac.2012040101.pdf_5.jpg",
+      "output_name": "skew__f014df28c779e195.jpg",
+      "remote_path": "Real5-OmniDocBench-Skew/scihub_ijcac.2012040101.pdf_5.jpg"
+    },
+    {
+      "condition": "warping",
+      "source_name": "scihub_ijcac.2012040101.pdf_5.jpg",
+      "output_name": "warping__f014df28c779e195.jpg",
+      "remote_path": "Real5-OmniDocBench-Warping/scihub_ijcac.2012040101.pdf_5.jpg"
+    },
+    {
+      "condition": "illumination",
+      "source_name": "newspaper_8076765115f6c402e81c6bfb48139bc2_1.jpg",
+      "output_name": "illumination__f2704bce032e2bb5.jpg",
+      "remote_path": "Real5-OmniDocBench-Illumination/newspaper_8076765115f6c402e81c6bfb48139bc2_1.jpg"
+    },
+    {
+      "condition": "scanning",
+      "source_name": "newspaper_8076765115f6c402e81c6bfb48139bc2_1.jpg",
+      "output_name": "scanning__f2704bce032e2bb5.jpg",
+      "remote_path": "Real5-OmniDocBench-Scanning/newspaper_8076765115f6c402e81c6bfb48139bc2_1.jpg"
+    },
+    {
+      "condition": "screen",
+      "source_name": "newspaper_8076765115f6c402e81c6bfb48139bc2_1.jpg",
+      "output_name": "screen__f2704bce032e2bb5.jpg",
+      "remote_path": "Real5-OmniDocBench-Screen-Photography/newspaper_8076765115f6c402e81c6bfb48139bc2_1.jpg"
+    },
+    {
+      "condition": "skew",
+      "source_name": "newspaper_8076765115f6c402e81c6bfb48139bc2_1.jpg",
+      "output_name": "skew__f2704bce032e2bb5.jpg",
+      "remote_path": "Real5-OmniDocBench-Skew/newspaper_8076765115f6c402e81c6bfb48139bc2_1.jpg"
+    },
+    {
+      "condition": "warping",
+      "source_name": "newspaper_8076765115f6c402e81c6bfb48139bc2_1.jpg",
+      "output_name": "warping__f2704bce032e2bb5.jpg",
+      "remote_path": "Real5-OmniDocBench-Warping/newspaper_8076765115f6c402e81c6bfb48139bc2_1.jpg"
+    },
+    {
+      "condition": "illumination",
+      "source_name": "magazine_TheEconomist.2024.03.02_page_032.png",
+      "output_name": "illumination__d1650767631202d8.png",
+      "remote_path": "Real5-OmniDocBench-Illumination/magazine_TheEconomist.2024.03.02_page_032.png"
+    },
+    {
+      "condition": "scanning",
+      "source_name": "magazine_TheEconomist.2024.03.02_page_032.png",
+      "output_name": "scanning__d1650767631202d8.png",
+      "remote_path": "Real5-OmniDocBench-Scanning/magazine_TheEconomist.2024.03.02_page_032.png"
+    },
+    {
+      "condition": "screen",
+      "source_name": "magazine_TheEconomist.2024.03.02_page_032.png",
+      "output_name": "screen__d1650767631202d8.png",
+      "remote_path": "Real5-OmniDocBench-Screen-Photography/magazine_TheEconomist.2024.03.02_page_032.png"
+    },
+    {
+      "condition": "skew",
+      "source_name": "magazine_TheEconomist.2024.03.02_page_032.png",
+      "output_name": "skew__d1650767631202d8.png",
+      "remote_path": "Real5-OmniDocBench-Skew/magazine_TheEconomist.2024.03.02_page_032.png"
+    },
+    {
+      "condition": "warping",
+      "source_name": "magazine_TheEconomist.2024.03.02_page_032.png",
+      "output_name": "warping__d1650767631202d8.png",
+      "remote_path": "Real5-OmniDocBench-Warping/magazine_TheEconomist.2024.03.02_page_032.png"
+    },
+    {
+      "condition": "illumination",
+      "source_name": "notes_1ba14cb325bc448f7201b20502ecf2b5_57.jpg",
+      "output_name": "illumination__d453369f88f0ae50.jpg",
+      "remote_path": "Real5-OmniDocBench-Illumination/notes_1ba14cb325bc448f7201b20502ecf2b5_57.jpg"
+    },
+    {
+      "condition": "scanning",
+      "source_name": "notes_1ba14cb325bc448f7201b20502ecf2b5_57.jpg",
+      "output_name": "scanning__d453369f88f0ae50.jpg",
+      "remote_path": "Real5-OmniDocBench-Scanning/notes_1ba14cb325bc448f7201b20502ecf2b5_57.jpg"
+    },
+    {
+      "condition": "screen",
+      "source_name": "notes_1ba14cb325bc448f7201b20502ecf2b5_57.jpg",
+      "output_name": "screen__d453369f88f0ae50.jpg",
+      "remote_path": "Real5-OmniDocBench-Screen-Photography/notes_1ba14cb325bc448f7201b20502ecf2b5_57.jpg"
+    },
+    {
+      "condition": "skew",
+      "source_name": "notes_1ba14cb325bc448f7201b20502ecf2b5_57.jpg",
+      "output_name": "skew__d453369f88f0ae50.jpg",
+      "remote_path": "Real5-OmniDocBench-Skew/notes_1ba14cb325bc448f7201b20502ecf2b5_57.jpg"
+    },
+    {
+      "condition": "warping",
+      "source_name": "notes_1ba14cb325bc448f7201b20502ecf2b5_57.jpg",
+      "output_name": "warping__d453369f88f0ae50.jpg",
+      "remote_path": "Real5-OmniDocBench-Warping/notes_1ba14cb325bc448f7201b20502ecf2b5_57.jpg"
+    },
+    {
+      "condition": "illumination",
+      "source_name": "eastmoney_fdae27854b0cffed1364e2a4457189b2a10ad0b058242ee3c8c9ee8993d7f5c0.pdf_1.jpg",
+      "output_name": "illumination__ec40e2e3565f4616.jpg",
+      "remote_path": "Real5-OmniDocBench-Illumination/eastmoney_fdae27854b0cffed1364e2a4457189b2a10ad0b058242ee3c8c9ee8993d7f5c0.pdf_1.jpg"
+    },
+    {
+      "condition": "scanning",
+      "source_name": "eastmoney_fdae27854b0cffed1364e2a4457189b2a10ad0b058242ee3c8c9ee8993d7f5c0.pdf_1.jpg",
+      "output_name": "scanning__ec40e2e3565f4616.jpg",
+      "remote_path": "Real5-OmniDocBench-Scanning/eastmoney_fdae27854b0cffed1364e2a4457189b2a10ad0b058242ee3c8c9ee8993d7f5c0.pdf_1.jpg"
+    },
+    {
+      "condition": "screen",
+      "source_name": "eastmoney_fdae27854b0cffed1364e2a4457189b2a10ad0b058242ee3c8c9ee8993d7f5c0.pdf_1.jpg",
+      "output_name": "screen__ec40e2e3565f4616.jpg",
+      "remote_path": "Real5-OmniDocBench-Screen-Photography/eastmoney_fdae27854b0cffed1364e2a4457189b2a10ad0b058242ee3c8c9ee8993d7f5c0.pdf_1.jpg"
+    },
+    {
+      "condition": "skew",
+      "source_name": "eastmoney_fdae27854b0cffed1364e2a4457189b2a10ad0b058242ee3c8c9ee8993d7f5c0.pdf_1.jpg",
+      "output_name": "skew__ec40e2e3565f4616.jpg",
+      "remote_path": "Real5-OmniDocBench-Skew/eastmoney_fdae27854b0cffed1364e2a4457189b2a10ad0b058242ee3c8c9ee8993d7f5c0.pdf_1.jpg"
+    },
+    {
+      "condition": "warping",
+      "source_name": "eastmoney_fdae27854b0cffed1364e2a4457189b2a10ad0b058242ee3c8c9ee8993d7f5c0.pdf_1.jpg",
+      "output_name": "warping__ec40e2e3565f4616.jpg",
+      "remote_path": "Real5-OmniDocBench-Warping/eastmoney_fdae27854b0cffed1364e2a4457189b2a10ad0b058242ee3c8c9ee8993d7f5c0.pdf_1.jpg"
+    },
+    {
+      "condition": "illumination",
+      "source_name": "yanbaopptmerge_yanbaoPPT_5345.jpg",
+      "output_name": "illumination__d707fbc32d9ba40b.jpg",
+      "remote_path": "Real5-OmniDocBench-Illumination/yanbaopptmerge_yanbaoPPT_5345.jpg"
+    },
+    {
+      "condition": "scanning",
+      "source_name": "yanbaopptmerge_yanbaoPPT_5345.jpg",
+      "output_name": "scanning__d707fbc32d9ba40b.jpg",
+      "remote_path": "Real5-OmniDocBench-Scanning/yanbaopptmerge_yanbaoPPT_5345.jpg"
+    },
+    {
+      "condition": "screen",
+      "source_name": "yanbaopptmerge_yanbaoPPT_5345.jpg",
+      "output_name": "screen__d707fbc32d9ba40b.jpg",
+      "remote_path": "Real5-OmniDocBench-Screen-Photography/yanbaopptmerge_yanbaoPPT_5345.jpg"
+    },
+    {
+      "condition": "skew",
+      "source_name": "yanbaopptmerge_yanbaoPPT_5345.jpg",
+      "output_name": "skew__d707fbc32d9ba40b.jpg",
+      "remote_path": "Real5-OmniDocBench-Skew/yanbaopptmerge_yanbaoPPT_5345.jpg"
+    },
+    {
+      "condition": "warping",
+      "source_name": "yanbaopptmerge_yanbaoPPT_5345.jpg",
+      "output_name": "warping__d707fbc32d9ba40b.jpg",
+      "remote_path": "Real5-OmniDocBench-Warping/yanbaopptmerge_yanbaoPPT_5345.jpg"
+    },
+    {
+      "condition": "illumination",
+      "source_name": "book_en_国外数学教材-非数学专业教材-线性代数-Gilbert Strang—Linear Algebra and Its Applications 4e_0100.png",
+      "output_name": "illumination__6b1f636b893dc6bd.png",
+      "remote_path": "Real5-OmniDocBench-Illumination/book_en_国外数学教材-非数学专业教材-线性代数-Gilbert Strang—Linear Algebra and Its Applications 4e_0100.png"
+    },
+    {
+      "condition": "scanning",
+      "source_name": "book_en_国外数学教材-非数学专业教材-线性代数-Gilbert Strang—Linear Algebra and Its Applications 4e_0100.png",
+      "output_name": "scanning__6b1f636b893dc6bd.png",
+      "remote_path": "Real5-OmniDocBench-Scanning/book_en_国外数学教材-非数学专业教材-线性代数-Gilbert Strang—Linear Algebra and Its Applications 4e_0100.png"
+    },
+    {
+      "condition": "screen",
+      "source_name": "book_en_国外数学教材-非数学专业教材-线性代数-Gilbert Strang—Linear Algebra and Its Applications 4e_0100.png",
+      "output_name": "screen__6b1f636b893dc6bd.png",
+      "remote_path": "Real5-OmniDocBench-Screen-Photography/book_en_国外数学教材-非数学专业教材-线性代数-Gilbert Strang—Linear Algebra and Its Applications 4e_0100.png"
+    },
+    {
+      "condition": "skew",
+      "source_name": "book_en_国外数学教材-非数学专业教材-线性代数-Gilbert Strang—Linear Algebra and Its Applications 4e_0100.png",
+      "output_name": "skew__6b1f636b893dc6bd.png",
+      "remote_path": "Real5-OmniDocBench-Skew/book_en_国外数学教材-非数学专业教材-线性代数-Gilbert Strang—Linear Algebra and Its Applications 4e_0100.png"
+    },
+    {
+      "condition": "warping",
+      "source_name": "book_en_国外数学教材-非数学专业教材-线性代数-Gilbert Strang—Linear Algebra and Its Applications 4e_0100.png",
+      "output_name": "warping__6b1f636b893dc6bd.png",
+      "remote_path": "Real5-OmniDocBench-Warping/book_en_国外数学教材-非数学专业教材-线性代数-Gilbert Strang—Linear Algebra and Its Applications 4e_0100.png"
+    }
+  ],
+  "tuning": [],
+  "holdout": [],
+  "counts": {
+    "base_pages": 10,
+    "conditions": 5,
+    "full": 50
+  }
+}
