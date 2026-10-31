@@ -14,7 +14,7 @@ COPY requirements/api.txt requirements/api.txt
 # index publishes: that single exact pin is fetched there without dependencies.
 # The index publishes no hashes, so the cp311 manylinux wheel is bound to the
 # sha256 recorded when it was reviewed; a different file fails the build.
-RUN pip install --upgrade pip==26.2.1 setuptools==83.0.0 \
+RUN pip install --upgrade pip==26.2.1 setuptools==84.2.1 \
     && grep -v '^paddlepaddle-gpu==' requirements/api.txt > /tmp/pypi.txt \
     && pip install --no-compile -r /tmp/pypi.txt \
     && echo "$(grep '^paddlepaddle-gpu==' requirements/api.txt) --hash=sha256:e14872e9cfe50f38961a420592cbded6160c332eb5f3dfdfd2731873582c3e65" > /tmp/paddle-gpu.txt \
@@ -100,7 +100,7 @@ ENV PYTHONUNBUFFERED=1 \
 WORKDIR /app
 COPY ocr-mcp-server/pyproject.toml ocr-mcp-server/README.md ./
 COPY ocr-mcp-server/ocr_mcp ./ocr_mcp
-RUN pip install --no-cache-dir --upgrade pip==26.2.1 setuptools==83.0.0 \
+RUN pip install --no-cache-dir --upgrade pip==26.2.1 setuptools==84.2.1 \
     && pip install --no-cache-dir . \
     && groupadd --gid 1000 appuser \
     && useradd --uid 1000 --gid appuser --create-home appuser

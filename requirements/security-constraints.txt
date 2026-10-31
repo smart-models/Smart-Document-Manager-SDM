@@ -5,6 +5,9 @@ certifi==2026.10.19
 # 28 Pillow advisories (CVE-2026-112390..112406, CVE-2026-112891..112902):
 # decoder/parser memory-safety and loop bugs; fixed in 13.0.0.
 pillow==13.0.0
+# GHSA-2qm8-x737-gmw5 / GHSA-9m75-vc3g-4x39 / GHSA-fm9c-5rcf-2q5p /
+# GHSA-mm57-4v3p-rchx: quadratic-time BER/CER/DER decoding; fixed in 0.6.5.
+pyasn1==0.6.5
 # GHSA-hq85-5cpj-mr62 / PYSEC-2026-4321: uv's bundled CA store trusts the same
 # compromised emSign root; fixed in 0.13.4.
 uv==0.13.4

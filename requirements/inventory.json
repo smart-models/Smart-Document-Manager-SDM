@@ -1,24 +1,24 @@
 {
   "app": {
     "image": "ocr-api:latest",
-    "image_id": "sha256:2892048f2a1587c5d737392ce13d1fd80011e2d998e0de4930a125bd9ca17d36",
+    "image_id": "sha256:c3daa00190413a8512c30bfde110b027a9e275136b92e58a1984318cf54c9e9e",
     "python": "3.11.16",
     "lock": "app-py311-linux.txt",
-    "sha256": "a6c08d9fe729d4b3abc1e5c063c840c442002bf1f981f1a98a65caab2b949935"
+    "sha256": "80e2754f62a7379dd3fb5e3fec08eb0bb8adfd455b0f91c230e1198f4f459998"
   },
   "mcp": {
     "image": "personal-smart-ocr-mcp:latest",
-    "image_id": "sha256:63bbee80381b7aeb322ecb9ab7f816b981203e0676f6250fe53f64168ac81bce",
+    "image_id": "sha256:3e50035199e353077f7a0b9c8a5cdfb0481c42e122954e8cb4824e3d6aa1e666",
     "python": "3.11.16",
     "lock": "mcp-py311-linux.txt",
-    "sha256": "b831420b97bff45b248803f61c72306a8aa29f24274eab6ffd4bb4f575bc634e"
+    "sha256": "fc8f0e52ddb49cc835f113901b97bce68ec3f0ca0ec25a8bf4ad9b1bf647ea46"
   },
   "vllm": {
     "image": "ocr-vllm:0.32.0-security",
-    "image_id": "sha256:03b7a4045bc451ee739778c379769ba4f55fa50480e128cba90b85d7c1406021",
+    "image_id": "sha256:997d33d1c4ce0878c518833aa641fa36fe66fb182ce0d46201a718e58a99bc16",
     "python": "3.12.3",
     "lock": "vllm-py312-linux.txt",
-    "sha256": "f1311925803b5a0d750eb36c74aeb7bedbae4803f637372cd398da6c88d37a42",
+    "sha256": "01a6baf3707a4ed077fc1ac7989ed5f771cc8dae14e04b4f3e5d6cc1f481dbb6",
     "base_image": "vllm/vllm-openai:v0.32.0@sha256:befccf0e7e4089aa23926bb6f887a85c0d46c2a99e6de5c5ffdf5cb7957c5b34"
   }
 }
