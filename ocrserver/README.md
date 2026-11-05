@@ -116,7 +116,7 @@ Client / Console / MCP ──► ocr_server.py + ocrserver/ (FastAPI, :8020) ─
 | `POST /chunk` | Yes (when token set) | Build normative RAG chunks from existing `/parse` JSON (`parsed_document` + explicit `options.max_tokens`) without GPU inference |
 | `POST /parse/chunks` | Yes (when token set) | Parse a document and immediately build RAG chunks in one request |
 | `POST /office/pdf` | Yes (when token set) | Convert an Office/OpenDocument file to PDF via headless LibreOffice and return PDF bytes |
-| `GET /storage/archives` | Yes + `OCR_STORAGE_BROWSER_ENABLED` | List archived `parse`, `ocr`, or `parse-chunks` jobs in S3 |
+| `GET /storage/archives` | Yes + `OCR_STORAGE_BROWSER_ENABLED` | List archived `parse`, `ocr`, or `parse-chunks` jobs in S3, one cursor page at a time; `total` counts the date range (null with `kind`, whose value only manifests hold) |
 | `GET /storage/archives/{job_id}` | Yes + `OCR_STORAGE_BROWSER_ENABLED` | Inspect manifest and artifact metadata for one archived job |
 | `GET /storage/file` | Yes + `OCR_STORAGE_BROWSER_ENABLED` | Download a single artifact by key with content-disposition headers |
 | `GET /storage/zip/{job_id}` | Yes + `OCR_STORAGE_BROWSER_ENABLED` | Stream an archive job as a ZIP bundle |

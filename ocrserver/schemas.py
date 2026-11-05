@@ -60,6 +60,9 @@ class StorageArchiveList(BaseModel):
     items: list[StorageArchiveSummary]
     next_cursor: str | None
     skipped_archives: int = 0
+    # Archives in the date range, on every page; null when filtered by type
+    # (the current layout keeps it in each manifest) or past the listing bound.
+    total: int | None = None
 
 
 class StorageFile(BaseModel):

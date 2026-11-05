@@ -247,6 +247,24 @@ async def test_current_and_legacy_layouts_are_both_listed_and_filterable(browser
     assert items[0]["job_id"] == "Abcd123_"
 
 
+async def test_listing_totals_every_page_unless_filtered_by_type(browser):
+    http, s3, _, _ = browser
+    s3.archive(1, day="2026/09/25")
+    s3.archive(2)
+    s3.current_archive()
+
+    first = (await http.get("/storage/archives", params={"limit": 1})).json()
+    params = {"limit": 1, "cursor": first["next_cursor"]}
+    second = (await http.get("/storage/archives", params=params)).json()
+
+    assert first["total"] == second["total"] == 3
+    params = {"date": "2026-09-26"}
+    assert (await http.get("/storage/archives", params=params)).json()["total"] == 2
+    # The current layout keeps its type in the manifest: counting would read all.
+    params = {"kind": "parse"}
+    assert (await http.get("/storage/archives", params=params)).json()["total"] is None
+
+
 async def test_listing_exposes_the_archived_source_and_the_zip_includes_it(browser):
     http, s3, _, _ = browser
     original = b"%PDF-1.7 original upload"

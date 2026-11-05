@@ -121,6 +121,7 @@ class StorageArchiveListPayload(ResponseModel):
     items: list[StorageArchiveSummaryPayload]
     next_cursor: str | None
     skipped_archives: int = Field(default=0, ge=0)
+    total: int | None = Field(default=None, ge=0)
 
 
 class StorageFilePayload(ResponseModel):

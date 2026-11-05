@@ -14,6 +14,7 @@ import time
 import zipfile
 from concurrent.futures import Future
 from datetime import UTC, datetime
+from itertools import islice
 from datetime import date as calendar_date
 
 import anyio
@@ -693,6 +694,14 @@ class StorageBrowser:
                 pool = self._indexed_candidates(
                     client, date_from, date_to, after, check
                 )
+                total = None
+                if kind is None:
+                    # Count index keys only; past the listing bound, give up.
+                    entries = self._indexed_candidates(
+                        client, date_from, date_to, None, check
+                    )
+                    counted = sum(1 for _ in islice(entries, MAX_LISTED_KEYS + 1))
+                    total = counted if counted <= MAX_LISTED_KEYS else None
             else:
                 # Old deployments stay readable until storage-init finishes backfill.
                 pool = sorted(
@@ -702,6 +711,7 @@ class StorageBrowser:
                     key=lambda entry: entry[:2],
                     reverse=True,
                 )
+                total = len(pool) if kind is None else None
                 if after is not None:
                     pool = [entry for entry in pool if entry[:2] < after]
             items, skipped, reads = [], 0, 0
@@ -712,6 +722,7 @@ class StorageBrowser:
                     "items": items,
                     "skipped_archives": skipped,
                     "next_cursor": encode(position) if position else None,
+                    "total": total,
                 }
 
             for sort_key, prefix, match in pool:

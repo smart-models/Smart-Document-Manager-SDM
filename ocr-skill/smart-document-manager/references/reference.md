@@ -260,7 +260,7 @@ Prefixes and keys are opaque: copy them exactly. Archives expire after
 
 | Tool | Fields | Result |
 |---|---|---|
-| ocr_list_storage_archives | kind, date or date_from/date_to, cursor, limit | items, next_cursor, skipped_archives |
+| ocr_list_storage_archives | kind, date or date_from/date_to, cursor, limit | items, next_cursor, skipped_archives, total |
 | ocr_get_storage_archive | prefix | prefix, manifest, files |
 | ocr_download_storage_file | key, preview (false) | key, content_type, size, sha256, and `text` or `base64`; images come as an image block |
 | ocr_download_storage_zip | prefix | prefix, content_type, sha256, base64 |
@@ -276,7 +276,9 @@ original upload `input.<ext>`, or null). Each page reads at most 100
 manifests, so a page can hold fewer than `limit` items, or none, while
 `next_cursor` is still set: follow it until null. `skipped_archives` counts
 archives younger than 10 minutes without a complete manifest (probably still
-being written); older ones are listed with `incomplete=true`.
+being written); older ones are listed with `incomplete=true`. `total` counts
+the archives in the date range across all pages (those still being written
+included), or is null when `kind` is set.
 
 Files: each entry has `key`, `name`, `size`, `content_type` and `sha256` (from
 the manifest, null when it has none). The returned manifest drops its

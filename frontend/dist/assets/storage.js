@@ -141,7 +141,7 @@ export function mountStorage(root, api) {
   const find = id => root.querySelector(`#storage-${id}`);
   const list = find("archives"), detail = find("detail"), status = find("status");
   const dialog = find("confirm");
-  let active = false, rows = [], currentCursor = null, nextCursor = null, history = [];
+  let active = false, rows = [], currentCursor = null, nextCursor = null, history = [], total = null;
   let selected = null, pendingDelete = null, deleting = false, imageUrl = null;
   let listRequest = null, detailRequest = null, previewRequest = null, fileStatus = null;
   const downloads = new Set();
@@ -165,8 +165,11 @@ export function mountStorage(root, api) {
     const visible = rows.filter(row => `${row.filename || ""} ${row.job_id} ${row.kind} ${row.prefix}`.toLowerCase().includes(query));
     const { wrapper, body } = tableView("Saved archives", ["File", "Output", "Created", "Files", "Size", "Action"]);
     list.replaceChildren(wrapper);
-    // The API pages by cursor and never counts the total: name only this page.
-    find("page-info").textContent = `Page ${history.length + 1} · ${visible.length} of ${rows.length} on this page`;
+    // The API total sizes the pages; the cursor decides where they end.
+    const page = history.length + 1;
+    const pages = total === null ? null
+      : nextCursor ? Math.max(Math.ceil(total / Number(find("page-size").value)), page + 1) : page;
+    find("page-info").textContent = pages ? `Page ${page} of ${pages}` : `Page ${page}`;
     if (!visible.length) {
       const text = query ? "No matches on this page." : nextCursor
         ? "No completed archives in this page. Continue with Next."
@@ -246,7 +249,7 @@ export function mountStorage(root, api) {
     if (dateFrom && dateTo && dateFrom > dateTo) {
       // Stale rows would still be paged with the previous filter.
       listRequest?.abort(); clearDetail();
-      rows = []; currentCursor = nextCursor = null; history = []; displayRows();
+      rows = []; currentCursor = nextCursor = total = null; history = []; displayRows();
       list.removeAttribute("aria-busy");
       find("refresh").disabled = false;
       find("prev").disabled = find("next").disabled = true;
@@ -258,7 +261,7 @@ export function mountStorage(root, api) {
     const controller = listRequest = new AbortController();
     const reopen = keepSelection ? selected : null;
     clearDetail();
-    rows = []; nextCursor = null; displayRows();
+    rows = []; nextCursor = total = null; displayRows();
     list.querySelector("tbody td").textContent = "Loading saved archives…";
     find("refresh").disabled = find("prev").disabled = find("next").disabled = true;
     message("Loading saved archives…");
@@ -281,6 +284,7 @@ export function mountStorage(root, api) {
       return false;
     }
     rows = result.data.items; nextCursor = result.data.next_cursor || null;
+    total = Number.isInteger(result.data.total) ? result.data.total : null;
     const skipped = Number(result.data.skipped_archives) || 0;
     message(skipped ? `${skipped} archives still being written are not shown yet.` : "");
     find("prev").disabled = !history.length;

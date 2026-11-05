@@ -58,7 +58,7 @@ async function storageFixture(page, { items = [ROW], files = FILES, deleteStatus
       deleted = deleteStatus === 200;
       await route.fulfill({ status: deleteStatus, json: deleted ? { deleted_objects: 3 } : { detail: { code: "storage_delete_partial", message: "Some files remain. Retry deletion." } } });
     } else if (url.pathname.endsWith("/archives")) {
-      await route.fulfill({ json: { items: deleted ? [] : items, next_cursor: null } });
+      await route.fulfill({ json: { items: deleted ? [] : items, next_cursor: null, total: deleted ? 0 : items.length } });
     } else if (url.pathname.endsWith("/archive")) {
       await route.fulfill({ json: { prefix: PREFIX, manifest: { complete: true }, files } });
     } else {
@@ -74,7 +74,7 @@ test("Storage browses files, previews safely, downloads and sends API authentica
   await openHealthyConsole(page);
   await withApi(page, api => api.saveToken("browser-test-key"));
   await page.getByRole("tab", { name: "Storage", exact: true }).click();
-  await expect(page.locator("#storage-page-info")).toContainText("1 of 1 on this page");
+  await expect(page.locator("#storage-page-info")).toHaveText("Page 1 of 1");
   await page.locator(".storage-archive").click();
   await expect(page.locator(".storage-file")).toHaveCount(3);
   await page.locator(".storage-file-choice").filter({ hasText: "document.md" }).click();
@@ -316,6 +316,27 @@ test("Storage archive page size and filters reset the cursor", async ({ page }) 
   await expect(page.locator("#storage-prev")).toBeDisabled();
   expect(calls.at(-1)).toMatchObject({ kind: "ocr", limit: "50" });
   expect(calls.at(-1).cursor).toBeUndefined();
+});
+
+test("Storage archive pages count from the API total", async ({ page }) => {
+  const next = { "": "page-two", "page-two": "page-three", "page-three": null };
+  await page.route("**/storage/archives?**", route => {
+    const query = Object.fromEntries(new URL(route.request().url()).searchParams);
+    // 35 promises four pages of 10; the cursor ending at three wins.
+    const total = query.kind ? null : 35;
+    return route.fulfill({ json: { items: [ROW], next_cursor: next[query.cursor || ""], total } });
+  });
+  await openHealthyConsole(page, "#storage");
+  const info = page.locator("#storage-page-info");
+  await expect(info).toHaveText("Page 1 of 4");
+  await page.locator("#storage-next").click();
+  await expect(info).toHaveText("Page 2 of 4");
+  await page.locator("#storage-next").click();
+  await expect(info).toHaveText("Page 3 of 3");
+  await page.locator("#storage-page-size").selectOption("20");
+  await expect(info).toHaveText("Page 1 of 2");
+  await page.locator("#storage-kind").selectOption("ocr");
+  await expect(info).toHaveText("Page 1");
 });
 
 for (const interaction of ["typing in the filter", "scrolling the page"]) {

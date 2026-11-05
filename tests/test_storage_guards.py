@@ -145,9 +145,11 @@ async def test_indexed_day_does_not_scan_50001_other_archives():
     browser = StorageBrowser(configured(), client=s3)
     response = await browser.archives(date_from="2026-09-26", date_to="2026-09-26")
     assert [r["prefix"] for r in response["items"]] == [target]
+    assert response["total"] == 1
+    # One bounded listing for the page and one for the total, both from the day.
     assert (
         len([c for op, c in s3.calls if op == "list" and c["Prefix"] == INDEX_ENTRIES])
-        == 1
+        == 2
     )
     empty = await browser.archives(date_from="2026-10-11", date_to="2026-10-11")
     assert empty["items"] == [] and empty["next_cursor"] is None
@@ -168,6 +170,34 @@ async def test_indexed_unfiltered_pages_do_not_scan_all_entries_and_skip_retenti
     second = await browser.archives(limit=1, cursor=first["next_cursor"])
     assert second["items"][0]["prefix"] == prefixes[0]
     assert second["next_cursor"] is None
+    await browser.close()
+
+
+async def test_indexed_listing_totals_the_date_range_on_every_page():
+    s3 = MemoryS3()
+    s3.archive(1, day="2026/09/25")
+    s3.archive(2)
+    s3.current_archive()
+    rebuild_index(s3, "ocr-outputs")
+    browser = StorageBrowser(configured(), client=s3)
+    first = await browser.archives(limit=1)
+    second = await browser.archives(limit=1, cursor=first["next_cursor"])
+    assert first["total"] == second["total"] == 3
+    assert (await browser.archives(date="2026-09-26"))["total"] == 2
+    assert (await browser.archives(date_from="2026-09-26"))["total"] == 2
+    assert (await browser.archives(kind="parse"))["total"] is None
+    await browser.close()
+
+
+async def test_indexed_total_gives_up_past_the_listing_bound(monkeypatch):
+    monkeypatch.setattr("ocrserver.storage_browser.MAX_LISTED_KEYS", 2)
+    s3 = MemoryS3()
+    prefixes = [s3.archive(i) for i in range(1, 4)]
+    rebuild_index(s3, "ocr-outputs")
+    browser = StorageBrowser(configured(), client=s3)
+    page = await browser.archives()
+    assert page["total"] is None
+    assert len(page["items"]) == len(prefixes)
     await browser.close()
 
 
