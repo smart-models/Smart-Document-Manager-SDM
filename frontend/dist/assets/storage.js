@@ -23,17 +23,24 @@ const ICONS = {
   gluePrevious: '<path d="M4 12h11M9 6l-5 6 5 6"/><rect x="17" y="6" width="4" height="12" rx="1"/>',
   glueNext: '<path d="M20 12H9M15 6l5 6-5 6"/><rect x="3" y="6" width="4" height="12" rx="1"/>',
   undo: '<path d="M9 7 4 12l5 5"/><path d="M4 12h10a6 6 0 0 1 0 12"/>',
+  sortable: '<path d="m8 10 4-4 4 4M8 14l4 4 4-4"/>',
+  ascending: '<path d="m7 14 5-5 5 5"/>',
+  descending: '<path d="m7 10 5 5 5-5"/>',
 };
 
-function iconButton(icon, label, extraClass = "", tooltip = "") {
+const icon = name => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name]}</svg>`;
+
+function iconButton(name, label, extraClass = "", tooltip = "") {
   const control = button("", `storage-action ${extraClass}`);
   control.title = tooltip || label;
   control.setAttribute("aria-label", label);
-  control.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[icon]}</svg>`;
+  control.innerHTML = icon(name);
   return control;
 }
 
-function tableView(label, columns) {
+// With `sorting` ({ keys, key, dir, onSort }), a column that has a key gets a
+// sort button and the sorted one carries aria-sort.
+function tableView(label, columns, sorting = null) {
   const wrapper = node("div", "", "storage-table-wrap");
   wrapper.tabIndex = 0;
   wrapper.setAttribute("role", "region");
@@ -41,11 +48,20 @@ function tableView(label, columns) {
   const table = node("table", "", "storage-table");
   const caption = node("caption", label, "storage-sr-only");
   const head = node("thead"), row = node("tr"), body = node("tbody");
-  for (const title of columns) {
-    const cell = node("th", title);
+  columns.forEach((title, index) => {
+    const key = sorting?.keys[index], cell = node("th", key ? "" : title);
     cell.scope = "col";
+    if (key) {
+      const order = sorting.key !== key ? "" : sorting.dir > 0 ? "ascending" : "descending";
+      if (order) cell.setAttribute("aria-sort", order);
+      const control = button(title, "storage-sort");
+      control.dataset.sort = key; control.title = `Sort by ${title}`;
+      control.insertAdjacentHTML("beforeend", icon(order || "sortable"));
+      control.addEventListener("click", () => sorting.onSort(key));
+      cell.append(control);
+    }
     row.append(cell);
-  }
+  });
   head.append(row); table.append(caption, head, body); wrapper.append(table);
   return { wrapper, body };
 }
@@ -141,7 +157,7 @@ export function mountStorage(root, api) {
   const find = id => root.querySelector(`#storage-${id}`);
   const list = find("archives"), detail = find("detail"), status = find("status");
   const dialog = find("confirm");
-  let active = false, rows = [], currentCursor = null, nextCursor = null, history = [], total = null;
+  let active = false, archives = [], pageIndex = 0, sort = { key: "created", dir: -1 };
   let selected = null, pendingDelete = null, deleting = false, imageUrl = null;
   let listRequest = null, detailRequest = null, previewRequest = null, fileStatus = null;
   const downloads = new Set();
@@ -160,21 +176,41 @@ export function mountStorage(root, api) {
     detail.removeAttribute("aria-busy");
     detail.replaceChildren(node("p", "Select an archive to view its files.", "storage-empty"));
   }
+  // Missing values sort last either way; ties keep the server's newest-first order.
+  const natural = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+  const SORT_VALUES = {
+    file: row => row.filename || row.job_id,
+    kind: row => row.kind,
+    created: row => { const time = Date.parse(row.created_at); return Number.isNaN(time) ? null : time; },
+    files: row => row.incomplete ? null : row.object_count,
+    size: row => row.incomplete ? null : row.total_bytes,
+  };
+  function compare(a, b) {
+    const x = SORT_VALUES[sort.key](a), y = SORT_VALUES[sort.key](b);
+    if (x === null || y === null) return (x === null) - (y === null);
+    return sort.dir * (typeof x === "string" ? natural.compare(x, y) : x - y);
+  }
+  // A new column starts ascending; the same column flips. Back to the first page.
+  function sortBy(key) {
+    sort = { key, dir: sort.key === key ? -sort.dir : 1 };
+    pageIndex = 0; displayRows();
+    list.querySelector(`[data-sort="${key}"]`).focus();
+  }
   function displayRows() {
+    const size = Number(find("page-size").value);
+    const pages = Math.max(1, Math.ceil(archives.length / size));
+    pageIndex = Math.min(pageIndex, pages - 1);
+    const rows = archives.slice().sort(compare).slice(pageIndex * size, (pageIndex + 1) * size);
     const query = find("search").value.trim().toLowerCase();
     const visible = rows.filter(row => `${row.filename || ""} ${row.job_id} ${row.kind} ${row.prefix}`.toLowerCase().includes(query));
-    const { wrapper, body } = tableView("Saved archives", ["File", "Output", "Created", "Files", "Size", "Action"]);
+    const { wrapper, body } = tableView("Saved archives", ["File", "Output", "Created", "Files", "Size", "Action"],
+      { keys: ["file", "kind", "created", "files", "size"], ...sort, onSort: sortBy });
     list.replaceChildren(wrapper);
-    // The API total sizes the pages; the cursor decides where they end.
-    const page = history.length + 1;
-    const pages = total === null ? null
-      : nextCursor ? Math.max(Math.ceil(total / Number(find("page-size").value)), page + 1) : page;
-    find("page-info").textContent = pages ? `Page ${page} of ${pages}` : `Page ${page}`;
+    find("page-info").textContent = `Page ${pageIndex + 1} of ${pages}`;
+    find("prev").disabled = pageIndex === 0;
+    find("next").disabled = pageIndex === pages - 1;
     if (!visible.length) {
-      const text = query ? "No matches on this page." : nextCursor
-        ? "No completed archives in this page. Continue with Next."
-        : history.length ? "No more archives on this page. Use Previous."
-          : "No saved archives found. Run Parse or OCR, then refresh.";
+      const text = query ? "No matches on this page." : "No saved archives found. Run Parse or OCR, then refresh.";
       const cell = node("td", text, "storage-empty"); cell.colSpan = 6;
       const line = node("tr"); line.append(cell); body.append(line);
     }
@@ -244,54 +280,58 @@ export function mountStorage(root, api) {
     if (target === find("page-info")) target.tabIndex = -1;
     target.focus({ preventScroll: true });
   }
-  async function loadPage(cursor = null, { keepSelection = false } = {}) {
+  // Every column sorts all archives of the filters, so a load follows every
+  // cursor and the console pages locally.
+  // ponytail: each load reads every manifest in range (~18 ms per archive);
+  // move sorting server-side if archives reach the thousands.
+  async function loadArchives({ keepSelection = false } = {}) {
     const dateFrom = find("date-from").value, dateTo = find("date-to").value;
     if (dateFrom && dateTo && dateFrom > dateTo) {
       // Stale rows would still be paged with the previous filter.
       listRequest?.abort(); clearDetail();
-      rows = []; currentCursor = nextCursor = total = null; history = []; displayRows();
+      archives = []; pageIndex = 0; displayRows();
       list.removeAttribute("aria-busy");
       find("refresh").disabled = false;
-      find("prev").disabled = find("next").disabled = true;
       message("From date must not be after To date.", true);
       return false;
     }
     const held = holdFocus();
     listRequest?.abort();
     const controller = listRequest = new AbortController();
-    const reopen = keepSelection ? selected : null;
+    const reopen = keepSelection ? selected : null, page = keepSelection ? pageIndex : 0;
     clearDetail();
-    rows = []; nextCursor = total = null; displayRows();
+    archives = []; displayRows();
     list.querySelector("tbody td").textContent = "Loading saved archives…";
     find("refresh").disabled = find("prev").disabled = find("next").disabled = true;
     message("Loading saved archives…");
     list.setAttribute("aria-busy", "true");
-    const result = await api.storageArchives({
-      kind: find("kind").value || undefined,
-      date_from: dateFrom || undefined, date_to: dateTo || undefined,
-      cursor: cursor || undefined, limit: Number(find("page-size").value),
-    }, { signal: controller.signal });
-    if (controller.signal.aborted || !active) return;
+    const filters = { kind: find("kind").value || undefined, date_from: dateFrom || undefined, date_to: dateTo || undefined };
+    const loaded = [];
+    let cursor, skipped = 0, result;
+    do {
+      result = await api.storageArchives({ ...filters, cursor, limit: 50 }, { signal: controller.signal });
+      if (controller.signal.aborted || !active) return;
+      if (!result.ok || !Array.isArray(result.data?.items)) break;
+      loaded.push(...result.data.items);
+      skipped += Number(result.data.skipped_archives) || 0;
+      cursor = result.data.next_cursor || undefined;
+      const total = Number.isInteger(result.data.total) ? ` of ${result.data.total}` : "";
+      if (cursor) message(`Loading saved archives… ${loaded.length}${total}`);
+    } while (cursor);
     list.removeAttribute("aria-busy");
     find("refresh").disabled = false;
-    currentCursor = cursor;
     if (!result.ok || !Array.isArray(result.data?.items)) {
-      rows = []; nextCursor = null; displayRows();
+      displayRows();
       message(failure(result, "Storage returned an unexpected response."), true);
       list.querySelector("tbody td").textContent = "Saved files could not be loaded. Refresh to try again.";
-      find("prev").disabled = !history.length;
       restoreFocus(held);
       return false;
     }
-    rows = result.data.items; nextCursor = result.data.next_cursor || null;
-    total = Number.isInteger(result.data.total) ? result.data.total : null;
-    const skipped = Number(result.data.skipped_archives) || 0;
+    archives = loaded; pageIndex = page;
     message(skipped ? `${skipped} archives still being written are not shown yet.` : "");
-    find("prev").disabled = !history.length;
-    find("next").disabled = !nextCursor;
     displayRows();
     restoreFocus(held);
-    const again = reopen && rows.find(row => row.prefix === reopen.prefix);
+    const again = reopen && archives.find(row => row.prefix === reopen.prefix);
     if (again) selectArchive(again, { moveFocus: false });
     return true;
   }
@@ -464,12 +504,15 @@ export function mountStorage(root, api) {
       if (active && !controller.signal.aborted) message(`ZIP of ${rowLabel(row)} failed: ${error.message || "download unavailable"}`, true);
     } finally { downloads.delete(controller); control.disabled = false; }
   }
-  // Refresh reloads the page being viewed; changing a filter starts over.
-  find("filters").addEventListener("submit", event => { event.preventDefault(); loadPage(currentCursor, { keepSelection: true }); });
-  for (const name of ["kind", "date-from", "date-to", "page-size"]) find(name).addEventListener("change", () => { history = []; loadPage(); });
+  // Refresh reloads and stays on the page viewed; a filter starts over;
+  // the page size only re-pages what is loaded.
+  find("filters").addEventListener("submit", event => { event.preventDefault(); loadArchives({ keepSelection: true }); });
+  for (const name of ["kind", "date-from", "date-to"]) find(name).addEventListener("change", () => loadArchives());
+  find("page-size").addEventListener("change", () => { pageIndex = 0; displayRows(); });
   find("search").addEventListener("input", displayRows);
-  find("next").addEventListener("click", () => { if (nextCursor) { history.push(currentCursor); loadPage(nextCursor); } });
-  find("prev").addEventListener("click", () => { if (history.length) loadPage(history.pop()); });
+  // The page buttons disable at the ends: keep focus on the other one.
+  find("next").addEventListener("click", () => { pageIndex++; displayRows(); if (find("next").disabled) find("prev").focus(); });
+  find("prev").addEventListener("click", () => { pageIndex--; displayRows(); if (find("prev").disabled) find("next").focus(); });
   find("cancel").addEventListener("click", () => dialog.close());
   dialog.addEventListener("cancel", event => { if (deleting) event.preventDefault(); });
   find("delete-confirm").addEventListener("click", async () => {
@@ -484,7 +527,7 @@ export function mountStorage(root, api) {
       const removed = pendingDelete.prefix;
       dialog.close(); pendingDelete = null;
       if (selected?.prefix === removed) clearDetail();
-      const refreshed = await loadPage(currentCursor, { keepSelection: true });
+      const refreshed = await loadArchives({ keepSelection: true });
       if (active) {
         message(refreshed ? "Archive deleted." : `Archive deleted. ${status.textContent}`, !refreshed);
         find("refresh").focus();
@@ -492,7 +535,7 @@ export function mountStorage(root, api) {
     } finally { deleting = false; find("cancel").disabled = find("delete-confirm").disabled = false; }
   });
   return {
-    activate() { active = true; history = []; loadPage(); },
+    activate() { active = true; loadArchives(); },
     deactivate() {
       active = false; listRequest?.abort(); detailRequest?.abort(); previewRequest?.abort();
       downloads.forEach(controller => controller.abort()); releaseImage();

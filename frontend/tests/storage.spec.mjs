@@ -152,19 +152,18 @@ test("Storage filters, searches this page, and preserves explicit deletion confi
   await expect(page.locator(".storage-archive")).toHaveCount(0);
 });
 
-test("Storage keeps bounded-scan empty pages navigable", async ({ page }) => {
+test("Storage follows cursors past bounded-scan empty pages", async ({ page }) => {
+  const cursors = [];
   await page.route("**/storage/archives?**", route => {
     const cursor = new URL(route.request().url()).searchParams.get("cursor");
+    cursors.push(cursor);
     return route.fulfill({ json: cursor ? { items: [ROW], next_cursor: null } : { items: [], next_cursor: "page-two" } });
   });
   await openHealthyConsole(page, "#storage");
-  await expect(page.locator("#storage-archives")).toContainText("Continue with Next");
-  await page.locator("#storage-next").click();
   await expect(page.locator(".storage-archive")).toHaveCount(1);
+  await expect(page.locator("#storage-page-info")).toHaveText("Page 1 of 1");
   await expect(page.locator("#storage-next")).toBeDisabled();
-  await page.locator("#storage-prev").click();
-  await expect(page.locator("#storage-prev")).toBeDisabled();
-  await expect(page.locator("#storage-next")).toBeEnabled();
+  expect(cursors).toEqual([null, "page-two"]);
 });
 
 test("Storage reports skipped corrupt archives without hiding readable ones", async ({ page }) => {
@@ -293,50 +292,99 @@ test("Storage tables expose icon actions and paginate files without losing selec
   await expect(page.locator("#storage-status")).toHaveText("Archive deleted.");
 });
 
-test("Storage archive page size and filters reset the cursor", async ({ page }) => {
+// Archive `index` was created index minutes after noon: higher is newer.
+function archiveRow(index, extra = {}) {
+  const code = `Code${String(index).padStart(4, "0")}`, minute = String(index).padStart(2, "0");
+  return {
+    ...CURRENT_ROW, prefix: `n${index}.pdf__20260926T12${minute}00000000Z__${code}/`, job_id: code,
+    filename: `n${index}.pdf`, created_at: `2026-09-26T12:${minute}:00Z`, ...extra,
+  };
+}
+
+// Serve rows newest first, at most `chunk` per request whatever the limit asks.
+async function routeArchives(page, rows, chunk = 10) {
   const calls = [];
   await page.route("**/storage/archives?**", route => {
     const query = Object.fromEntries(new URL(route.request().url()).searchParams);
     calls.push(query);
-    return route.fulfill({ json: { items: [ROW], next_cursor: query.cursor ? null : "page-two" } });
+    const start = Number(query.cursor || 0), end = start + Math.min(Number(query.limit), chunk);
+    return route.fulfill({ json: {
+      items: rows.slice(start, end), next_cursor: end < rows.length ? String(end) : null, total: rows.length,
+    } });
   });
-  await openHealthyConsole(page, "#storage");
-  await page.locator("#storage-next").click();
-  await expect(page.locator("#storage-page-info")).toContainText("Page 2");
-  await expect(page.locator("#storage-next")).toBeDisabled();
-  await page.locator("#storage-page-size").selectOption("50");
-  await expect(page.locator("#storage-page-info")).toContainText("Page 1");
-  await expect(page.locator("#storage-prev")).toBeDisabled();
-  expect(calls.at(-1).limit).toBe("50");
-  expect(calls.at(-1).cursor).toBeUndefined();
-  await page.locator("#storage-next").click();
-  await expect(page.locator("#storage-page-info")).toContainText("Page 2");
-  await page.locator("#storage-kind").selectOption("ocr");
-  await expect(page.locator("#storage-page-info")).toContainText("Page 1");
-  await expect(page.locator("#storage-prev")).toBeDisabled();
-  expect(calls.at(-1)).toMatchObject({ kind: "ocr", limit: "50" });
-  expect(calls.at(-1).cursor).toBeUndefined();
-});
+  return calls;
+}
 
-test("Storage archive pages count from the API total", async ({ page }) => {
-  const next = { "": "page-two", "page-two": "page-three", "page-three": null };
-  await page.route("**/storage/archives?**", route => {
-    const query = Object.fromEntries(new URL(route.request().url()).searchParams);
-    // 35 promises four pages of 10; the cursor ending at three wins.
-    const total = query.kind ? null : 35;
-    return route.fulfill({ json: { items: [ROW], next_cursor: next[query.cursor || ""], total } });
-  });
+const archiveNames = page => page.locator("#storage-archives tbody .storage-name").allTextContents();
+
+test("Storage loads every archive page once, then pages locally", async ({ page }) => {
+  const calls = await routeArchives(page, Array.from({ length: 25 }, (_, i) => archiveRow(25 - i)));
   await openHealthyConsole(page, "#storage");
   const info = page.locator("#storage-page-info");
-  await expect(info).toHaveText("Page 1 of 4");
+  await expect(info).toHaveText("Page 1 of 3");
+  expect(calls.map(call => [call.cursor, call.limit])).toEqual([[undefined, "50"], ["10", "50"], ["20", "50"]]);
+  expect((await archiveNames(page))[0]).toBe("n25.pdf");
   await page.locator("#storage-next").click();
-  await expect(info).toHaveText("Page 2 of 4");
+  await expect(info).toHaveText("Page 2 of 3");
   await page.locator("#storage-next").click();
   await expect(info).toHaveText("Page 3 of 3");
+  await expect(page.locator("#storage-archives tbody tr")).toHaveCount(5);
+  await expect(page.locator("#storage-prev")).toBeFocused();
   await page.locator("#storage-page-size").selectOption("20");
   await expect(info).toHaveText("Page 1 of 2");
+  expect(calls).toHaveLength(3);
   await page.locator("#storage-kind").selectOption("ocr");
-  await expect(info).toHaveText("Page 1");
+  await expect(info).toHaveText("Page 1 of 2");
+  expect(calls).toHaveLength(6);
+  expect(calls.at(-3)).toMatchObject({ kind: "ocr", limit: "50" });
+  expect(calls.at(-3).cursor).toBeUndefined();
+});
+
+test("Storage sorts every loaded archive by column, ascending then descending", async ({ page }) => {
+  // Twelve rows over two requests: the oldest is the largest, n7 is the only OCR,
+  // N3 is capitalised and n5 is an abandoned write without counts.
+  const rows = Array.from({ length: 12 }, (_, i) => archiveRow(12 - i, {
+    total_bytes: (i + 1) * 100, object_count: 12 - i, kind: i === 5 ? "ocr" : "parse",
+  }));
+  rows[9] = { ...rows[9], filename: "N3.pdf" };
+  rows[7] = { ...rows[7], incomplete: true, kind: "unknown", object_count: 0, total_bytes: 0 };
+  await routeArchives(page, rows, 7);
+  await openHealthyConsole(page, "#storage");
+  const header = name => page.locator("#storage-archives th").filter({ hasText: new RegExp(`^${name}$`) });
+  const sortBy = name => page.getByRole("button", { name, exact: true });
+  await expect(page.locator("#storage-page-info")).toHaveText("Page 1 of 2");
+  await expect(header("Created")).toHaveAttribute("aria-sort", "descending");
+  await expect(page.locator("#storage-archives th[aria-sort]")).toHaveCount(1);
+  expect((await archiveNames(page)).slice(0, 2)).toEqual(["n12.pdf", "n11.pdf"]);
+
+  await sortBy("File").click();
+  await expect(header("File")).toHaveAttribute("aria-sort", "ascending");
+  await expect(header("Created")).not.toHaveAttribute("aria-sort");
+  await expect(sortBy("File")).toBeFocused();
+  expect((await archiveNames(page)).slice(0, 4)).toEqual(["n1.pdf", "n2.pdf", "N3.pdf", "n4.pdf"]);
+  await sortBy("File").click();
+  await expect(header("File")).toHaveAttribute("aria-sort", "descending");
+  expect((await archiveNames(page)).slice(0, 2)).toEqual(["n12.pdf", "n11.pdf"]);
+
+  await sortBy("Size").click();
+  await sortBy("Size").click();
+  await expect(header("Size")).toHaveAttribute("aria-sort", "descending");
+  expect((await archiveNames(page)).slice(0, 2)).toEqual(["n1.pdf", "n2.pdf"]);
+  await page.locator("#storage-next").click();
+  await expect(page.locator("#storage-page-info")).toHaveText("Page 2 of 2");
+  expect(await archiveNames(page)).toEqual(["n12.pdf", "n5.pdf"]);
+
+  await sortBy("Output").click();
+  await expect(page.locator("#storage-page-info")).toHaveText("Page 1 of 2");
+  expect((await archiveNames(page))[0]).toBe("n7.pdf");
+  await sortBy("Files").click();
+  await sortBy("Files").click();
+  expect((await archiveNames(page))[0]).toBe("n12.pdf");
+  await sortBy("Created").click();
+  await expect(header("Created")).toHaveAttribute("aria-sort", "ascending");
+  expect((await archiveNames(page))[0]).toBe("n1.pdf");
+  await expect(page.locator("#storage-archives th").last()).not.toHaveAttribute("aria-sort");
+  await expect(page.locator("#storage-archives th").last().getByRole("button")).toHaveCount(0);
 });
 
 for (const interaction of ["typing in the filter", "scrolling the page"]) {

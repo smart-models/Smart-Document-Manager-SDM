@@ -36,6 +36,12 @@
 .storage-table tr.is-selected td:first-child { box-shadow: inset 3px 0 var(--blue); }
 .storage-table th:last-child, .storage-table td:last-child:not([colspan]) { position: sticky; right: 0; width: 1%; border-left: 1px solid var(--border-2); }
 .storage-table th:last-child { z-index: 1; }
+.storage-sort { display: inline-flex; align-items: center; gap: .35rem; padding: 0; margin: 0; background: none; border: 0; color: inherit; font: inherit; letter-spacing: inherit; text-transform: inherit; white-space: nowrap; cursor: pointer; transition: color .15s ease; }
+.storage-sort svg { width: 12px; height: 12px; flex: none; opacity: 0; pointer-events: none; transition: opacity .15s ease; }
+.storage-sort:hover, .storage-sort:focus-visible { color: var(--ink); }
+.storage-sort:hover svg, .storage-sort:focus-visible svg { opacity: .55; }
+.storage-table th[aria-sort] .storage-sort { color: var(--blue); }
+.storage-table th[aria-sort] .storage-sort svg { opacity: 1; }
 .storage-name { display: block; border: 0; background: none; color: var(--ink); font: inherit; text-align: left; cursor: pointer; padding: .35rem 0; overflow-wrap: anywhere; min-width: 11rem; max-width: 28rem; }
 .storage-name:hover, .storage-name[aria-pressed="true"] { color: var(--blue); }
 .storage-job-code { display: block; color: var(--muted); font-size: .65rem; }
