@@ -13,7 +13,7 @@ import threading
 import time
 import zipfile
 from concurrent.futures import Future
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from datetime import date as calendar_date
 
 import anyio
@@ -21,6 +21,7 @@ from fastapi import HTTPException, Request, Response
 
 from ocrserver.archive_names import KINDS, parse_prefix, prefix_from_key
 from ocrserver.storage_index import (
+    INCOMPLETE_AFTER,
     INDEX_ENTRIES,
     INDEX_READY,
     index_archive,
@@ -50,7 +51,6 @@ MAX_DOWNLOADS = 2
 SCAN_KEYS = 1000
 MAX_LISTED_KEYS = 50_000
 MAX_MANIFEST_READS = 100
-INCOMPLETE_AFTER = timedelta(minutes=10)
 # SeaweedFS keeps listing a deleted archive's folder as an empty prefix.
 _GONE = object()
 TEXT_PREVIEW_BYTES = 1024 * 1024
@@ -1126,6 +1126,15 @@ class StorageBrowser:
                 if result.get("Errors") or len(completed) != len(batch):
                     raise _error(503, "storage_delete_partial", deleted_objects=deleted)
                 check()
+            # Unindex only a vanished archive; a leftover entry would page empty.
+            # ponytail: a failure here leaves an orphan for rebuild_index to prune.
+            try:
+                client.delete_objects(
+                    Bucket=self.settings.s3_bucket,
+                    Delete={"Objects": [{"Key": index_key(prefix)}], "Quiet": True},
+                )
+            except Exception:  # noqa: BLE001, S110 - SDK errors may contain secrets
+                pass
             return {"deleted_objects": deleted}
 
         return await self._run_mutation(prefix, remove)

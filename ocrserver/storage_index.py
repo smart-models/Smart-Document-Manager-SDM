@@ -1,10 +1,14 @@
 """Versioned temporal index; entries contain only verified archive addresses."""
 
+from datetime import UTC, datetime, timedelta
+
 from ocrserver.archive_names import parse_prefix, prefix_from_key
 
 INDEX_ROOT = "_archive_index/v1/"
 INDEX_ENTRIES = INDEX_ROOT + "entries/"
 INDEX_READY = INDEX_ROOT + "ready.json"
+# A writer may still be reserving an archive this young: keep its entry.
+INCOMPLETE_AFTER = timedelta(minutes=10)
 _REVERSE_DIGITS = str.maketrans("0123456789", "9876543210")
 
 
@@ -102,37 +106,68 @@ def touch_index(writer, bucket, prefix, check, *, reader=None):
         check()
 
 
-def rebuild_index(client, bucket):
-    """Stream a repeatable backfill; publish readiness only after a full scan.
-
-    New writers index before reserving an archive, so concurrent new writes do
-    not fall through a scan whose lexical position has already advanced.
-    """
-    after = previous_prefix = ""
-    count = 0
+def _keys(client, bucket, prefix):
+    """Yield every key under a prefix, rejecting a listing that does not advance."""
+    after = ""
     while True:
         result = client.list_objects_v2(
             Bucket=bucket,
-            Prefix="",
+            Prefix=prefix,
             MaxKeys=1000,
             **({"StartAfter": after} if after else {}),
         )
         records = result.get("Contents", [])
         for item in records:
-            key = item["Key"]
-            if key <= after:
+            if item["Key"] <= after:
                 raise ValueError("Storage listing did not advance")
-            after = key
-            prefix = prefix_from_key(key)
-            if prefix and prefix != previous_prefix:
-                write_entry(client, bucket, prefix)
-                previous_prefix = prefix
-                count += 1
+            after = item["Key"]
+            yield after
         if not result.get("IsTruncated"):
-            break
+            return
         if not records:
             raise ValueError("Storage listing did not advance")
+
+
+def _orphan(key, live):
+    """Whether an entry names no archive and no writer can still be reserving it."""
+    try:
+        prefix = index_archive(key)
+    except (ValueError, UnicodeError):
+        return True  # noncanonical, e.g. a stamp misread by an earlier release
+    if prefix in live:
+        return False
+    written = datetime.strptime(sort_stamp(prefix), "%Y%m%dT%H%M%S%fZ")
+    return datetime.now(UTC) - written.replace(tzinfo=UTC) >= INCOMPLETE_AFTER
+
+
+def rebuild_index(client, bucket):
+    """Reconcile the index with the bucket; publish readiness after a full scan.
+
+    New writers index before reserving an archive, so concurrent new writes do
+    not fall through a scan whose lexical position has already advanced, and
+    an entry younger than INCOMPLETE_AFTER survives without its objects.
+    Existing entries are not rewritten, so retention expires them with their
+    archive; entries of deleted or expired archives are removed.
+    Return the number of archives found.
+    """
+    indexed = set(_keys(client, bucket, INDEX_ENTRIES))
+    live = set()
+    for key in _keys(client, bucket, ""):
+        prefix = prefix_from_key(key)
+        if prefix and prefix not in live:
+            live.add(prefix)
+            if index_key(prefix) not in indexed:
+                write_entry(client, bucket, prefix)
+    orphans = [key for key in sorted(indexed) if _orphan(key, live)]
+    for offset in range(0, len(orphans), 1000):
+        client.delete_objects(
+            Bucket=bucket,
+            Delete={
+                "Objects": [{"Key": key} for key in orphans[offset : offset + 1000]],
+                "Quiet": True,
+            },
+        )
     client.put_object(
         Bucket=bucket, Key=INDEX_READY, Body=b"1", ContentType="text/plain"
     )
-    return count
+    return len(live)

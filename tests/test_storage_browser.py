@@ -19,6 +19,7 @@ from test_storage import wait_event
 from ocr_server import create_app
 from ocrserver.config import Settings, load_settings
 from ocrserver.storage_browser import StorageBrowser
+from ocrserver.storage_index import index_key
 
 
 def configured(**kwargs):
@@ -530,9 +531,12 @@ async def test_delete_requires_exact_confirmation_and_keeps_manifest_on_partial_
     )
     assert response.json() == {"deleted_objects": 2}
     assert all(key.startswith(other) for key in s3.objects)
-    assert [call for op, call in s3.calls if op == "delete"][-1]["Delete"][
-        "Objects"
-    ] == [{"Key": prefix + "manifest.json"}]
+    deletes = [call["Delete"]["Objects"] for op, call in s3.calls if op == "delete"]
+    # The manifest goes after the data, and the index entry after the manifest.
+    assert deletes[-2:] == [
+        [{"Key": prefix + "manifest.json"}],
+        [{"Key": index_key(prefix)}],
+    ]
 
 
 @pytest.mark.parametrize("cancel", [False, True])

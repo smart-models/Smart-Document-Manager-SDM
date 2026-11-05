@@ -1,6 +1,7 @@
 """Storage failures and indexed listing, with isolated S3 fakes."""
 
 import asyncio
+from datetime import UTC, datetime
 
 import httpx
 import pytest
@@ -170,12 +171,73 @@ async def test_indexed_unfiltered_pages_do_not_scan_all_entries_and_skip_retenti
     await browser.close()
 
 
+async def test_deleted_archives_leave_no_index_entries_or_empty_pages(monkeypatch):
+    monkeypatch.setattr("ocrserver.storage_browser.MAX_MANIFEST_READS", 2)
+    s3 = MemoryS3()
+    prefixes = [s3.archive(i) for i in range(1, 6)]
+    rebuild_index(s3, "ocr-outputs")
+    browser = StorageBrowser(configured(), client=s3)
+    for number in (2, 3, 4):
+        await browser.delete(prefixes[number - 1], f"{number:032x}")
+        assert index_key(prefixes[number - 1]) not in s3.objects
+    pages, cursor = [], None
+    while True:
+        page = await browser.archives(limit=1, cursor=cursor)
+        pages.append([item["prefix"] for item in page["items"]])
+        cursor = page["next_cursor"]
+        if not cursor:
+            break
+    assert pages == [[prefixes[4]], [prefixes[0]]]
+    await browser.close()
+
+
+def test_backfill_prunes_vanished_archives_but_not_ones_being_written():
+    s3 = MemoryS3()
+    live = s3.archive(1)
+    vanished = "gone.pdf__20260925T120000000000Z__Gone123_/"
+    # Writers index before reserving: a fresh entry may not have objects yet.
+    stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S%fZ")
+    writing = f"new.pdf__{stamp}__Fresh12_/"
+    for prefix in (vanished, writing):
+        s3.objects[index_key(prefix)] = b""
+    assert rebuild_index(s3, "ocr-outputs") == 1
+    assert {
+        index_archive(key) for key in s3.objects if key.startswith(INDEX_ENTRIES)
+    } == {live, writing}
+
+
+def test_backfill_does_not_renew_existing_entries_past_retention():
+    s3 = MemoryS3()
+    s3.archive(1)
+    rebuild_index(s3, "ocr-outputs")
+    s3.calls.clear()
+    rebuild_index(s3, "ocr-outputs")
+    assert not [
+        call
+        for op, call in s3.calls
+        if op == "put" and call["Key"].startswith(INDEX_ENTRIES)
+    ]
+
+
 def test_job_codes_containing_double_underscores_sort_by_their_timestamp():
     from ocrserver.storage_index import sort_stamp
 
     prefix = "a.pdf__20260926T120000000000Z__38__XqSe/"
     assert sort_stamp(prefix) == "20260926T120000000000Z"
     assert index_archive(index_key(prefix)) == prefix
+
+
+def test_backfill_replaces_an_entry_indexed_under_a_misread_stamp():
+    s3 = MemoryS3()
+    prefix = s3.current_archive(code="38__XqSe")
+    reverse = str.maketrans("0123456789", "9876543210")
+    stamp = "20260926T120000000000Z".translate(reverse)
+    # Earlier releases read the stamp "38" from the code "38__XqSe".
+    misread = index_key(prefix).replace(stamp, "38".translate(reverse), 1)
+    s3.objects[misread] = b""
+    rebuild_index(s3, "ocr-outputs")
+    assert misread not in s3.objects
+    assert index_key(prefix) in s3.objects
 
 
 def test_failed_backfill_does_not_publish_readiness():

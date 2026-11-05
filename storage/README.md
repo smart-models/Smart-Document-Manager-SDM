@@ -46,7 +46,11 @@ by the operator via `python scripts/configure_storage.py` before starting the
    loopback ports on the host.
 4. **Index rebuild on bootstrap.** `storage/bootstrap.py` calls
    `ocrserver.storage_index.rebuild_index` after reconciling IAM policies and
-   lifecycle rules so the archive index reflects current bucket contents.
+   lifecycle rules so the archive index reflects current bucket contents: it
+   adds missing entries, leaves existing ones untouched (so retention expires
+   them with their archive), and removes entries whose archive is gone or whose
+   key is noncanonical, sparing those younger than ten minutes that a writer
+   may still be reserving. Deleting an archive also removes its entry.
 
 ## Map of the code
 
