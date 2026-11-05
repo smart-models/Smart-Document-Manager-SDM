@@ -18,7 +18,8 @@ def sort_stamp(prefix):
     if match is None:
         raise ValueError("Invalid archive address")
     if match["kind"] is None:
-        return prefix.split("__")[-2]
+        # The eight-character code may itself contain "__"; slice from the end.
+        return prefix[-33:-11]
     return match["date"].replace("-", "") + "T000000000000Z"
 
 

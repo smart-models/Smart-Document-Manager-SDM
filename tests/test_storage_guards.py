@@ -170,6 +170,14 @@ async def test_indexed_unfiltered_pages_do_not_scan_all_entries_and_skip_retenti
     await browser.close()
 
 
+def test_job_codes_containing_double_underscores_sort_by_their_timestamp():
+    from ocrserver.storage_index import sort_stamp
+
+    prefix = "a.pdf__20260926T120000000000Z__38__XqSe/"
+    assert sort_stamp(prefix) == "20260926T120000000000Z"
+    assert index_archive(index_key(prefix)) == prefix
+
+
 def test_failed_backfill_does_not_publish_readiness():
     class Failing(MemoryS3):
         def put_object(self, **kwargs):
