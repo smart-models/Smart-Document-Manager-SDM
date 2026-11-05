@@ -74,7 +74,7 @@ test("Storage browses files, previews safely, downloads and sends API authentica
   await openHealthyConsole(page);
   await withApi(page, api => api.saveToken("browser-test-key"));
   await page.getByRole("tab", { name: "Storage", exact: true }).click();
-  await expect(page.locator("#storage-page-info")).toContainText("1 of 1 archives");
+  await expect(page.locator("#storage-page-info")).toContainText("1 of 1 on this page");
   await page.locator(".storage-archive").click();
   await expect(page.locator(".storage-file")).toHaveCount(3);
   await page.locator(".storage-file-choice").filter({ hasText: "document.md" }).click();

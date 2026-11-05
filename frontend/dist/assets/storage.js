@@ -165,7 +165,8 @@ export function mountStorage(root, api) {
     const visible = rows.filter(row => `${row.filename || ""} ${row.job_id} ${row.kind} ${row.prefix}`.toLowerCase().includes(query));
     const { wrapper, body } = tableView("Saved archives", ["File", "Output", "Created", "Files", "Size", "Action"]);
     list.replaceChildren(wrapper);
-    find("page-info").textContent = `Page ${history.length + 1} · ${visible.length} of ${rows.length} archives`;
+    // The API pages by cursor and never counts the total: name only this page.
+    find("page-info").textContent = `Page ${history.length + 1} · ${visible.length} of ${rows.length} on this page`;
     if (!visible.length) {
       const text = query ? "No matches on this page." : nextCursor
         ? "No completed archives in this page. Continue with Next."
