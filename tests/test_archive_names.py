@@ -39,6 +39,7 @@ def test_archive_prefix_uses_utc_and_round_trips_folder_components():
         "date": "2026-09-27",
         "job": "Abcd123_",
         "filename": "report.pdf",
+        "stamp": "20260927T123000000000Z",
     }
 
 
@@ -63,4 +64,5 @@ def test_historical_archive_prefix_remains_valid():
         "date": "2026-09-27",
         "job": "a" * 32,
         "filename": None,
+        "stamp": "20260927T000000000000Z",
     }

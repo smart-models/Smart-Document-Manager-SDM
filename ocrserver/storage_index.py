@@ -2,12 +2,13 @@
 
 from datetime import UTC, datetime, timedelta
 
-from ocrserver.archive_names import parse_prefix, prefix_from_key
+from ocrserver.archive_names import STAMP_FORMAT, parse_prefix, prefix_from_key
 
 INDEX_ROOT = "_archive_index/v1/"
 INDEX_ENTRIES = INDEX_ROOT + "entries/"
 INDEX_READY = INDEX_ROOT + "ready.json"
-# A writer may still be reserving an archive this young: keep its entry.
+# Below this age an archive without a complete manifest may still be being
+# written, so it is neither listed as abandoned, deleted nor unindexed.
 INCOMPLETE_AFTER = timedelta(minutes=10)
 _REVERSE_DIGITS = str.maketrans("0123456789", "9876543210")
 
@@ -15,16 +16,18 @@ _REVERSE_DIGITS = str.maketrans("0123456789", "9876543210")
 def sort_stamp(prefix):
     """Return a sortable UTC stamp from a validated current or legacy address.
 
-    Legacy archives carry only a date, so their time is represented as midnight.
     Raise ValueError when the prefix is not a recognized archive address.
     """
     match = parse_prefix(prefix)
     if match is None:
         raise ValueError("Invalid archive address")
-    if match["kind"] is None:
-        # The eight-character code may itself contain "__"; slice from the end.
-        return prefix[-33:-11]
-    return match["date"].replace("-", "") + "T000000000000Z"
+    return match["stamp"]
+
+
+def stale(stamp):
+    """Return whether an archive stamp is older than INCOMPLETE_AFTER."""
+    written = datetime.strptime(stamp, STAMP_FORMAT).replace(tzinfo=UTC)
+    return datetime.now(UTC) - written >= INCOMPLETE_AFTER
 
 
 def index_key(prefix):
@@ -107,7 +110,17 @@ def touch_index(writer, bucket, prefix, check, *, reader=None):
 
 
 def _keys(client, bucket, prefix):
-    """Yield every key under a prefix, rejecting a listing that does not advance."""
+    """Yield every key under a prefix, in listing order.
+
+    Args:
+        client: S3 client allowed to list the bucket.
+        bucket: Bucket to list.
+        prefix: Key prefix to list; empty for the whole bucket.
+
+    Raises:
+        ValueError: A listing left the prefix or did not advance. Callers delete
+            from these keys, so a malformed listing must stop them.
+    """
     after = ""
     while True:
         result = client.list_objects_v2(
@@ -118,8 +131,8 @@ def _keys(client, bucket, prefix):
         )
         records = result.get("Contents", [])
         for item in records:
-            if item["Key"] <= after:
-                raise ValueError("Storage listing did not advance")
+            if not item["Key"].startswith(prefix) or item["Key"] <= after:
+                raise ValueError("Storage listing left its prefix or did not advance")
             after = item["Key"]
             yield after
         if not result.get("IsTruncated"):
@@ -129,15 +142,21 @@ def _keys(client, bucket, prefix):
 
 
 def _orphan(key, live):
-    """Whether an entry names no archive and no writer can still be reserving it."""
+    """Return whether an index entry should be pruned.
+
+    Args:
+        key: Index entry key.
+        live: Addresses of the archives that have objects in the bucket.
+
+    A noncanonical key is always an orphan, for example a stamp misread by an
+    earlier release. Otherwise the entry must name no live archive and be too old
+    for a writer to still be reserving that archive.
+    """
     try:
         prefix = index_archive(key)
     except (ValueError, UnicodeError):
-        return True  # noncanonical, e.g. a stamp misread by an earlier release
-    if prefix in live:
-        return False
-    written = datetime.strptime(sort_stamp(prefix), "%Y%m%dT%H%M%S%fZ")
-    return datetime.now(UTC) - written.replace(tzinfo=UTC) >= INCOMPLETE_AFTER
+        return True
+    return prefix not in live and stale(sort_stamp(prefix))
 
 
 def rebuild_index(client, bucket):
@@ -147,8 +166,20 @@ def rebuild_index(client, bucket):
     not fall through a scan whose lexical position has already advanced, and
     an entry younger than INCOMPLETE_AFTER survives without its objects.
     Existing entries are not rewritten, so retention expires them with their
-    archive; entries of deleted or expired archives are removed.
-    Return the number of archives found.
+    archive. Orphans (see _orphan) are pruned best effort: they only cost listings
+    a manifest read, so a failed prune neither blocks startup nor readiness, and
+    the next rebuild retries it. Every index key and archive address is held in
+    memory during the scan.
+
+    Args:
+        client: S3 client allowed to list, write and delete in the bucket.
+        bucket: Archive bucket shared by the index and document objects.
+
+    Returns:
+        The number of archives found in the bucket.
+
+    Raises:
+        ValueError: A listing was malformed; nothing is pruned or published.
     """
     indexed = set(_keys(client, bucket, INDEX_ENTRIES))
     live = set()
@@ -158,15 +189,16 @@ def rebuild_index(client, bucket):
             live.add(prefix)
             if index_key(prefix) not in indexed:
                 write_entry(client, bucket, prefix)
-    orphans = [key for key in sorted(indexed) if _orphan(key, live)]
-    for offset in range(0, len(orphans), 1000):
-        client.delete_objects(
-            Bucket=bucket,
-            Delete={
-                "Objects": [{"Key": key} for key in orphans[offset : offset + 1000]],
-                "Quiet": True,
-            },
-        )
+    orphans = [key for key in indexed if _orphan(key, live)]
+    try:
+        for offset in range(0, len(orphans), 1000):
+            batch = orphans[offset : offset + 1000]
+            client.delete_objects(
+                Bucket=bucket,
+                Delete={"Objects": [{"Key": key} for key in batch], "Quiet": True},
+            )
+    except Exception:  # noqa: BLE001, S110 - SDK errors may contain secrets
+        pass
     client.put_object(
         Bucket=bucket, Key=INDEX_READY, Body=b"1", ContentType="text/plain"
     )

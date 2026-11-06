@@ -115,8 +115,6 @@ def _archive_rows(payload: dict) -> list[str]:
 def _list_rows(payload: dict) -> list[str]:
     items = payload.get("items", [])
     rows = [bullet("Archives", len(items))]
-    if payload.get("total") is not None:
-        rows.append(bullet("Total in range", payload["total"]))
     if payload.get("next_cursor"):
         rows.append(bullet("Next cursor", "present"))
     if payload.get("skipped_archives"):
@@ -162,10 +160,10 @@ def register(mcp: MCPServer, ctx: ToolContext) -> None:
               "kind":"parse"|"ocr"|"parse-chunks"|"unknown","created_at":str|null,
               "object_count":int,"total_bytes":int,"partial_ocr":bool,
               "unprocessed_pages":[int],"incomplete":bool,"input_key":str|null}],
-             "next_cursor":str|null,"skipped_archives":int,"total":int|null}.
+             "next_cursor":str|null,"skipped_archives":int}.
             unknown/incomplete marks an abandoned archive; skipped_archives counts
-            unreadable manifests, so an empty page alone does not prove no results.
-            total counts the date range across pages; null when kind is set.
+            archives under 10 minutes old without a complete manifest, so an empty
+            page alone does not prove no results.
 
         Examples:
             Use when: finding yesterday's saved invoice without parsing it again.

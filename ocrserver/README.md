@@ -98,7 +98,7 @@ Client / Console / MCP ──► ocr_server.py + ocrserver/ (FastAPI, :8020) ─
 | `markdown_normalizer.py`, `table_md.py` | Post-processing of VLM Markdown and HTML-to-GFM table conversion | Markdown formatting or table normalization changes |
 | `json_rag.py`, `rag_structure.py`, `rag_refinement.py`, `rag_split.py` | Inline `json_rag` hierarchy builder and stored-archive RAG structure refinement/splitting | Hierarchical section trees or stored RAG repair workflows change |
 | `token_count.py` | Local Hugging Face `tokenizers` wrapper for exact PaddleOCR-VL token counting | Tokenizer loading or token counting changes |
-| `storage.py`, `storage_browser.py`, `storage_index.py`, `artifacts.py`, `archive_names.py` | S3 `ArtifactStore` writer, `/storage/*` browser/download/delete routes, ZIP streaming, and archive key naming | S3 object layout, retention headers, or `/storage/*` routes change |
+| `storage.py`, `storage_browser.py`, `storage_index.py`, `artifacts.py`, `archive_names.py` | S3 `ArtifactStore` writer, `/storage/*` browser/download/delete routes, ZIP streaming, temporal archive index reconciled by `rebuild_index`, and archive key naming | S3 object layout, retention headers, or `/storage/*` routes change |
 | `metrics.py` | Prometheus counters, histograms, and gauges (`ocr_*`) | Telemetry metric names or labels change |
 | `autotune/` | `tiers.py` (GPU tier detection & model revision pin), `fingerprint.py`, `gates.py` (CER, latency, preemption, KV-cache gates), `profile.py`, `runner.py` | Hardware tier thresholds, model revision pin, or autotune gates change |
 | `chunking/` | `api.py` (`/chunk`, `/parse/chunks`), `runtime.py` (worker pool), `engine.py`, `packing.py` (DP packer), `splitting.py`, `tables.py`, `table_units.py`, `relations.py`, `relation_mapping.py`, `overlap.py`, `provenance.py`, `canonical.py`, `rendering.py`, `validation.py`, `rag.schema.json` | RAG chunking algorithm, budget limits, or `rag.schema.json` contract changes |
@@ -116,11 +116,11 @@ Client / Console / MCP ──► ocr_server.py + ocrserver/ (FastAPI, :8020) ─
 | `POST /chunk` | Yes (when token set) | Build normative RAG chunks from existing `/parse` JSON (`parsed_document` + explicit `options.max_tokens`) without GPU inference |
 | `POST /parse/chunks` | Yes (when token set) | Parse a document and immediately build RAG chunks in one request |
 | `POST /office/pdf` | Yes (when token set) | Convert an Office/OpenDocument file to PDF via headless LibreOffice and return PDF bytes |
-| `GET /storage/archives` | Yes + `OCR_STORAGE_BROWSER_ENABLED` | List archived `parse`, `ocr`, or `parse-chunks` jobs in S3, one cursor page at a time; `total` counts the date range (null with `kind`, whose value only manifests hold) |
-| `GET /storage/archives/{job_id}` | Yes + `OCR_STORAGE_BROWSER_ENABLED` | Inspect manifest and artifact metadata for one archived job |
+| `GET /storage/archives` | Yes + `OCR_STORAGE_BROWSER_ENABLED` | List archived `parse`, `ocr`, or `parse-chunks` jobs in S3, one cursor page at a time |
+| `GET /storage/archive` | Yes + `OCR_STORAGE_BROWSER_ENABLED` | Inspect manifest and artifact metadata for the archive at `prefix` |
 | `GET /storage/file` | Yes + `OCR_STORAGE_BROWSER_ENABLED` | Download a single artifact by key with content-disposition headers |
-| `GET /storage/zip/{job_id}` | Yes + `OCR_STORAGE_BROWSER_ENABLED` | Stream an archive job as a ZIP bundle |
-| `DELETE /storage/archives/{job_id}` | Yes + exact `confirm` | Delete an entire archived job |
+| `GET /storage/archive.zip` | Yes + `OCR_STORAGE_BROWSER_ENABLED` | Stream the archive at `prefix` as a ZIP bundle |
+| `DELETE /storage/archive` | Yes + exact `confirm` | Delete the entire archive at `prefix` |
 | `DELETE /storage/file` | Yes + exact `confirm` | Delete a single archived artifact |
 | `POST /storage/rag/refine`, `POST /storage/rag/split` | Yes + `OCR_STORAGE_BROWSER_ENABLED` | Refine section hierarchy or preview/apply manual group splits on a stored archive |
 
@@ -189,6 +189,10 @@ descriptions live in [`.env.example`](../.env.example) and
 - **Storage archival is non-blocking to OCR responses when disabled, and
   explicitly reported via `X-OCR-Storage-*` headers and `storage` metadata when
   enabled.**
+- **Whole-archive deletion unindexes best effort.** Once every object is gone the
+  API removes the archive's index entry and ignores a failure: a leftover entry
+  only costs listings one manifest read until the next `stack.* up` prunes it. A
+  partial deletion keeps the entry, so the archive stays listed for a retry.
 
 ## Capabilities and limits
 

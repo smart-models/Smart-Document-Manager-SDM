@@ -8,13 +8,16 @@ import pytest
 from fastapi import HTTPException
 
 from ocr_server import create_app
+from ocrserver.archive_names import archive_prefix
 from ocrserver.storage_browser import StorageBrowser
 from ocrserver.storage_index import (
+    _REVERSE_DIGITS,
     INDEX_ENTRIES,
     INDEX_READY,
     index_key,
     index_archive,
     rebuild_index,
+    sort_stamp,
 )
 from test_mcp_schema import FakePipeline, FakeRecognizer
 from test_storage_browser import MemoryS3, configured
@@ -93,8 +96,6 @@ async def test_slow_confirmation_times_out_before_any_s3_operation(monkeypatch, 
 
 
 def test_index_sorts_like_existing_timestamp_and_prefix_order():
-    from ocrserver.storage_index import sort_stamp
-
     prefixes = [
         "a.pdf__20260926T120000000000Z__Abcd123_/",
         "b.pdf__20260926T120000000000Z__Abcd123_/",
@@ -145,11 +146,9 @@ async def test_indexed_day_does_not_scan_50001_other_archives():
     browser = StorageBrowser(configured(), client=s3)
     response = await browser.archives(date_from="2026-09-26", date_to="2026-09-26")
     assert [r["prefix"] for r in response["items"]] == [target]
-    assert response["total"] == 1
-    # One bounded listing for the page and one for the total, both from the day.
     assert (
         len([c for op, c in s3.calls if op == "list" and c["Prefix"] == INDEX_ENTRIES])
-        == 2
+        == 1
     )
     empty = await browser.archives(date_from="2026-10-11", date_to="2026-10-11")
     assert empty["items"] == [] and empty["next_cursor"] is None
@@ -165,39 +164,16 @@ async def test_indexed_unfiltered_pages_do_not_scan_all_entries_and_skip_retenti
         if key.startswith(prefixes[2]):
             del s3.objects[key]
     browser = StorageBrowser(configured(), client=s3)
+    s3.calls.clear()
     first = await browser.archives(limit=1)
     assert first["items"][0]["prefix"] == prefixes[1]
+    assert (
+        len([c for op, c in s3.calls if op == "list" and c["Prefix"] == INDEX_ENTRIES])
+        == 1
+    )
     second = await browser.archives(limit=1, cursor=first["next_cursor"])
     assert second["items"][0]["prefix"] == prefixes[0]
     assert second["next_cursor"] is None
-    await browser.close()
-
-
-async def test_indexed_listing_totals_the_date_range_on_every_page():
-    s3 = MemoryS3()
-    s3.archive(1, day="2026/09/25")
-    s3.archive(2)
-    s3.current_archive()
-    rebuild_index(s3, "ocr-outputs")
-    browser = StorageBrowser(configured(), client=s3)
-    first = await browser.archives(limit=1)
-    second = await browser.archives(limit=1, cursor=first["next_cursor"])
-    assert first["total"] == second["total"] == 3
-    assert (await browser.archives(date="2026-09-26"))["total"] == 2
-    assert (await browser.archives(date_from="2026-09-26"))["total"] == 2
-    assert (await browser.archives(kind="parse"))["total"] is None
-    await browser.close()
-
-
-async def test_indexed_total_gives_up_past_the_listing_bound(monkeypatch):
-    monkeypatch.setattr("ocrserver.storage_browser.MAX_LISTED_KEYS", 2)
-    s3 = MemoryS3()
-    prefixes = [s3.archive(i) for i in range(1, 4)]
-    rebuild_index(s3, "ocr-outputs")
-    browser = StorageBrowser(configured(), client=s3)
-    page = await browser.archives()
-    assert page["total"] is None
-    assert len(page["items"]) == len(prefixes)
     await browser.close()
 
 
@@ -226,8 +202,7 @@ def test_backfill_prunes_vanished_archives_but_not_ones_being_written():
     live = s3.archive(1)
     vanished = "gone.pdf__20260925T120000000000Z__Gone123_/"
     # Writers index before reserving: a fresh entry may not have objects yet.
-    stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S%fZ")
-    writing = f"new.pdf__{stamp}__Fresh12_/"
+    writing = archive_prefix("new.pdf", datetime.now(UTC), "Fresh12_") + "/"
     for prefix in (vanished, writing):
         s3.objects[index_key(prefix)] = b""
     assert rebuild_index(s3, "ocr-outputs") == 1
@@ -249,9 +224,40 @@ def test_backfill_does_not_renew_existing_entries_past_retention():
     ]
 
 
-def test_job_codes_containing_double_underscores_sort_by_their_timestamp():
-    from ocrserver.storage_index import sort_stamp
+def test_backfill_refuses_a_listing_outside_the_index():
+    class Stray(MemoryS3):
+        def list_objects_v2(self, **kwargs):
+            if kwargs["Prefix"] != INDEX_ENTRIES:
+                return super().list_objects_v2(**kwargs)
+            keys = sorted(key for key in self.objects if key.startswith("parse/"))
+            return {
+                "Contents": [{"Key": key, "Size": 0} for key in keys],
+                "IsTruncated": False,
+            }
 
+    s3 = Stray()
+    s3.archive(1)
+    before = set(s3.objects)
+    with pytest.raises(ValueError):
+        rebuild_index(s3, "ocr-outputs")
+    assert set(s3.objects) == before
+
+
+def test_backfill_survives_a_failed_prune_and_still_publishes_readiness():
+    class Failing(MemoryS3):
+        def delete_objects(self, **kwargs):
+            raise TimeoutError("read timeout")
+
+    s3 = Failing()
+    s3.archive(1)
+    orphan = index_key("gone.pdf__20260925T120000000000Z__Gone123_/")
+    s3.objects[orphan] = b""
+    assert rebuild_index(s3, "ocr-outputs") == 1
+    assert INDEX_READY in s3.objects
+    assert orphan in s3.objects
+
+
+def test_job_codes_containing_double_underscores_sort_by_their_timestamp():
     prefix = "a.pdf__20260926T120000000000Z__38__XqSe/"
     assert sort_stamp(prefix) == "20260926T120000000000Z"
     assert index_archive(index_key(prefix)) == prefix
@@ -260,10 +266,9 @@ def test_job_codes_containing_double_underscores_sort_by_their_timestamp():
 def test_backfill_replaces_an_entry_indexed_under_a_misread_stamp():
     s3 = MemoryS3()
     prefix = s3.current_archive(code="38__XqSe")
-    reverse = str.maketrans("0123456789", "9876543210")
-    stamp = "20260926T120000000000Z".translate(reverse)
+    stamp = sort_stamp(prefix).translate(_REVERSE_DIGITS)
     # Earlier releases read the stamp "38" from the code "38__XqSe".
-    misread = index_key(prefix).replace(stamp, "38".translate(reverse), 1)
+    misread = index_key(prefix).replace(stamp, "38".translate(_REVERSE_DIGITS), 1)
     s3.objects[misread] = b""
     rebuild_index(s3, "ocr-outputs")
     assert misread not in s3.objects
@@ -284,7 +289,7 @@ def test_failed_backfill_does_not_publish_readiness():
     assert INDEX_READY not in s3.objects
 
 
-def test_backfill_streams_across_listing_boundaries_without_losing_prefixes():
+def test_backfill_crosses_listing_boundaries_without_losing_prefixes():
     s3 = MemoryS3()
     prefixes = [s3.archive(i) for i in range(1, 401)]
     assert rebuild_index(s3, "ocr-outputs") == len(prefixes)

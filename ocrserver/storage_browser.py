@@ -14,21 +14,25 @@ import time
 import zipfile
 from concurrent.futures import Future
 from datetime import UTC, datetime
-from itertools import islice
 from datetime import date as calendar_date
 
 import anyio
 from fastapi import HTTPException, Request, Response
 
-from ocrserver.archive_names import KINDS, parse_prefix, prefix_from_key
+from ocrserver.archive_names import (
+    KINDS,
+    STAMP_FORMAT,
+    parse_prefix,
+    prefix_from_key,
+)
 from ocrserver.storage_index import (
-    INCOMPLETE_AFTER,
     INDEX_ENTRIES,
     INDEX_READY,
     index_archive,
     index_key,
     index_start,
     sort_stamp,
+    stale,
     touch_index,
 )
 from ocrserver.schemas import (
@@ -477,12 +481,6 @@ class StorageBrowser:
         """
         return sort_stamp(prefix)
 
-    @staticmethod
-    def _stale(sort_key):
-        """An archive without a complete manifest may still be being written."""
-        written = datetime.strptime(sort_key, "%Y%m%dT%H%M%S%fZ").replace(tzinfo=UTC)
-        return datetime.now(UTC) - written >= INCOMPLETE_AFTER
-
     def _candidates(self, client, roots, lower_bound, date_from, date_to, check):
         """Every archive prefix in range, from listings only (no manifest reads)."""
         found, listed = [], 0
@@ -529,6 +527,12 @@ class StorageBrowser:
         return found
 
     def _indexed_candidates(self, client, date_from, date_to, after, check):
+        """Yield (stamp, prefix, match) newest first from index keys, without reads.
+
+        Start at the cursor position `after` when given, else at `date_to`, and
+        stop at the first entry older than `date_from`. A key that does not decode
+        canonically raises 503 storage_invalid_listing; rebuild_index prunes it.
+        """
         start = index_start(date_to)
         if after is not None:
             stamp, prefix = after
@@ -575,9 +579,9 @@ class StorageBrowser:
                 and not self._list(client, prefix, "", 1, check)[0]
             ):
                 return _GONE
-            if not self._stale(sort_key):
+            if not stale(sort_key):
                 return None
-            written = datetime.strptime(sort_key, "%Y%m%dT%H%M%S%fZ")
+            written = datetime.strptime(sort_key, STAMP_FORMAT)
             return {
                 "prefix": prefix,
                 "job_id": match["job"],
@@ -629,7 +633,14 @@ class StorageBrowser:
         cursor=None,
         limit=20,
     ):
-        """List filtered archives in newest-first order using validated cursors."""
+        """List filtered archives in newest-first order using validated cursors.
+
+        Return `items`, `next_cursor` (null on the last page) and `skipped_archives`
+        (archives that may still be being written). A page can hold fewer than
+        `limit` items, or none, while `next_cursor` is set: each reads a bounded
+        number of manifests. Invalid arguments raise 422 with a storage_invalid_*
+        code; listing failures raise 503 or 413.
+        """
         if kind is not None and kind not in KINDS:
             raise _error(422, "storage_invalid_kind")
         if type(limit) is not int or not 1 <= limit <= 50:
@@ -694,14 +705,6 @@ class StorageBrowser:
                 pool = self._indexed_candidates(
                     client, date_from, date_to, after, check
                 )
-                total = None
-                if kind is None:
-                    # Count index keys only; past the listing bound, give up.
-                    entries = self._indexed_candidates(
-                        client, date_from, date_to, None, check
-                    )
-                    counted = sum(1 for _ in islice(entries, MAX_LISTED_KEYS + 1))
-                    total = counted if counted <= MAX_LISTED_KEYS else None
             else:
                 # Old deployments stay readable until storage-init finishes backfill.
                 pool = sorted(
@@ -711,7 +714,6 @@ class StorageBrowser:
                     key=lambda entry: entry[:2],
                     reverse=True,
                 )
-                total = len(pool) if kind is None else None
                 if after is not None:
                     pool = [entry for entry in pool if entry[:2] < after]
             items, skipped, reads = [], 0, 0
@@ -722,7 +724,6 @@ class StorageBrowser:
                     "items": items,
                     "skipped_archives": skipped,
                     "next_cursor": encode(position) if position else None,
-                    "total": total,
                 }
 
             for sort_key, prefix, match in pool:
@@ -1093,6 +1094,8 @@ class StorageBrowser:
 
             Refuse incomplete archives that may still have an active writer.
             Report confirmed deletions on partial failure so retries remain safe.
+            Finally drop the index entry, best effort: a failure there leaves an
+            orphan that listings skip and rebuild_index prunes.
             """
             records = self._objects(client, prefix, check)
             manifest_key = prefix + "manifest.json"
@@ -1106,7 +1109,7 @@ class StorageBrowser:
                 ):
                     raise
                 # Without a complete manifest the writer may still be running.
-                if not self._stale(self._sort_key(prefix, match)):
+                if not stale(self._sort_key(prefix, match)):
                     raise _error(409, "storage_archive_in_progress") from error
             keys = [item["Key"] for item in records if item["Key"] != manifest_key]
             batches = [
@@ -1137,8 +1140,6 @@ class StorageBrowser:
                 if result.get("Errors") or len(completed) != len(batch):
                     raise _error(503, "storage_delete_partial", deleted_objects=deleted)
                 check()
-            # Unindex only a vanished archive; a leftover entry would page empty.
-            # ponytail: a failure here leaves an orphan for rebuild_index to prune.
             try:
                 client.delete_objects(
                     Bucket=self.settings.s3_bucket,

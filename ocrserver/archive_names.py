@@ -7,6 +7,8 @@ import unicodedata
 from datetime import UTC, date, datetime, timezone
 
 KINDS = ("ocr", "parse", "parse-chunks")
+# Microsecond UTC stamp embedded in current archive addresses.
+STAMP_FORMAT = "%Y%m%dT%H%M%S%fZ"
 _OLD = re.compile(
     r"(?P<kind>ocr|parse|parse-chunks)/(?P<year>\d{4})/"
     r"(?P<month>\d{2})/(?P<day>\d{2})/(?P<job>[0-9a-f]{32})/"
@@ -36,12 +38,17 @@ def safe_filename(original: str | None, extension: str = "bin") -> str:
 
 def archive_prefix(filename: str, when: datetime, code: str) -> str:
     """One root folder per request: filename, UTC timestamp, eight-char code."""
-    stamp = when.astimezone(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+    stamp = when.astimezone(timezone.utc).strftime(STAMP_FORMAT)
     return f"{filename}__{stamp}__{code}"
 
 
 def parse_prefix(value: str) -> dict[str, str | None] | None:
-    """Return verified address fields for both archive layouts."""
+    """Return verified address fields for both archive layouts, or None.
+
+    Fields are kind (legacy layout only), date (ISO), job, filename (current
+    layout only) and stamp, whose format is STAMP_FORMAT. Legacy addresses carry
+    only a day, so their stamp is that day's midnight.
+    """
     old = _OLD.fullmatch(value)
     if old:
         try:
@@ -53,13 +60,12 @@ def parse_prefix(value: str) -> dict[str, str | None] | None:
             "date": day.isoformat(),
             "job": old["job"],
             "filename": None,
+            "stamp": day.strftime("%Y%m%d") + "T000000000000Z",
         }
     new = _NEW.fullmatch(value)
     if new:
         try:
-            stamp = datetime.strptime(new["stamp"], "%Y%m%dT%H%M%S%fZ").replace(
-                tzinfo=UTC
-            )
+            stamp = datetime.strptime(new["stamp"], STAMP_FORMAT).replace(tzinfo=UTC)
         except ValueError:
             return None
         return {
@@ -67,6 +73,7 @@ def parse_prefix(value: str) -> dict[str, str | None] | None:
             "date": stamp.date().isoformat(),
             "job": new["job"],
             "filename": new["filename"],
+            "stamp": new["stamp"],
         }
     return None
 

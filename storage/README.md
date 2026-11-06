@@ -44,13 +44,10 @@ by the operator via `python scripts/configure_storage.py` before starting the
    proxies S3 (`:8333`) and admin console (`:23646`) traffic to `seaweedfs` over
    the internal `smart-document-manager-storage` network while publishing
    loopback ports on the host.
-4. **Index rebuild on bootstrap.** `storage/bootstrap.py` calls
+4. **Index reconcile on bootstrap.** `storage/bootstrap.py` calls
    `ocrserver.storage_index.rebuild_index` after reconciling IAM policies and
-   lifecycle rules so the archive index reflects current bucket contents: it
-   adds missing entries, leaves existing ones untouched (so retention expires
-   them with their archive), and removes entries whose archive is gone or whose
-   key is noncanonical, sparing those younger than ten minutes that a writer
-   may still be reserving. Deleting an archive also removes its entry.
+   lifecycle rules, so each `up` brings the archive index back in line with the
+   bucket.
 
 ## Map of the code
 
@@ -61,7 +58,7 @@ by the operator via `python scripts/configure_storage.py` before starting the
 | `start.sh` | Pre-entrypoint shell guard for `seaweedfs` verifying required admin/console environment variables | SeaweedFS container startup prerequisites change |
 | [`../scripts/configure_storage.py`](../scripts/configure_storage.py) | Operator CLI helper that populates missing `OCR_S3_*` / `OCR_SEAWEED_*` secrets in `.env` and adds `storage` to `COMPOSE_PROFILES` | Required storage secret names or defaults change |
 | [`../ocrserver/storage.py`](../ocrserver/storage.py), [`../ocrserver/storage_browser.py`](../ocrserver/storage_browser.py), [`../ocrserver/storage_index.py`](../ocrserver/storage_index.py) | API-side writer, browser/delete routes, and S3 archive index | Archive object layout or `/storage/*` API behavior changes |
-| [`../tests/test_storage_setup.py`](../tests/test_storage_setup.py), [`../tests/test_storage.py`](../tests/test_storage.py), [`../tests/test_api_storage.py`](../tests/test_api_storage.py) | Offline unit tests for `bootstrap.py`, `configure_storage.py`, `ArtifactStore`, and `/storage/*` routes | Any storage bootstrap or API change |
+| [`../tests/test_storage_setup.py`](../tests/test_storage_setup.py), [`../tests/test_storage.py`](../tests/test_storage.py), [`../tests/test_api_storage.py`](../tests/test_api_storage.py), [`../tests/test_storage_browser.py`](../tests/test_storage_browser.py), [`../tests/test_storage_guards.py`](../tests/test_storage_guards.py) | Offline unit tests for `bootstrap.py`, `configure_storage.py`, `ArtifactStore`, `/storage/*` routes, and the archive index reconcile | Any storage bootstrap, API, or index change |
 
 ## Interface reference
 
@@ -106,11 +103,18 @@ Defined in `.env.example` Sections 12 and 13:
 - **Preflight validation (`scripts/verify_token_config.py`)** refuses startup if
   the `storage` profile or `OCR_STORAGE_ENABLED=true` is active while required
   S3 credentials are missing or overlapping across roles.
+- **`rebuild_index` reconciles and never renews.** It writes only missing index
+  entries, so retention expires an existing entry with its archive. It deletes
+  noncanonical entries always, and entries whose archive is gone unless their
+  address stamp is under ten minutes old, since a writer may still be reserving
+  that archive. Pruning is best effort: a failure there leaves the orphans for
+  the next `up` and never blocks startup. A malformed listing stops the run before
+  anything is pruned, and readiness is published only after the full scan.
 
 ## Capabilities and limits
 
 **You can:** provision idempotent bucket/IAM/retention state on every `up`,
-rotate managed S3 keys by updating `.env` and re-running `up`, and isolate S3
+reconcile the archive index on every `up`, rotate managed S3 keys by updating `.env` and re-running `up`, and isolate S3
 traffic on the internal `smart-document-manager-storage` bridge network.
 
 **You cannot:** pass `OCR_S3_ADMIN_*` to `ocr-api` (blocked by
@@ -140,7 +144,7 @@ Run the offline storage bootstrap, verifier, and API storage suites from the
 repository root:
 
 ```powershell
-python -m pytest tests/test_storage_setup.py tests/test_storage.py tests/test_api_storage.py tests/test_mcp_storage.py -q
+python -m pytest tests/test_storage_setup.py tests/test_storage.py tests/test_api_storage.py tests/test_storage_browser.py tests/test_storage_guards.py tests/test_mcp_storage.py -q
 python scripts/verify_compose_security.py --env-file .env.example
 ```
 
@@ -154,6 +158,8 @@ For live end-to-end verification against running containers, use
 | `Run scripts/configure_storage.py first` or preflight error | Run `python scripts/configure_storage.py` to populate missing `OCR_S3_*` and `OCR_SEAWEED_*` keys in `.env` |
 | `Configured identity credentials are invalid` | Access key and secret key are out of sync; rotate both together in `.env` and re-run `up` |
 | `SeaweedFS was not ready within 60 seconds` | Inspect `stack.ps1 logs -Service seaweedfs` and verify volume permissions on `ocr-output-storage` |
+| `storage_invalid_listing` on every archive listing after an upgrade | A noncanonical index entry fails the indexed listing. Run `stack.* up` so `storage-init` prunes it; rebuilding only `ocr-api` does not run `storage-init` |
+| Short or empty listing pages that still carry a cursor | Index entries of archives already gone cost the page its manifest reads; the next `stack.* up` prunes them |
 
 ## Invariants
 
