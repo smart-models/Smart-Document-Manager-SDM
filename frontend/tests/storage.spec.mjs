@@ -348,6 +348,7 @@ async function routeArchives(page, rows, chunk = 10) {
 }
 
 const archiveNames = page => page.locator("#storage-archives tbody .storage-name").allTextContents();
+const clickColumn = (page, name) => page.getByRole("button", { name, exact: true }).click();
 
 test("Storage loads every archive page once, then pages locally", async ({ page }) => {
   const calls = await routeArchives(page, Array.from({ length: 25 }, (_, i) => archiveRow(25 - i)));
@@ -560,12 +561,25 @@ test("Storage keeps the scroll and an unobscured header when rows are rebuilt at
   await expect(size).toBeFocused();
   expect(await wrap.evaluate(element => element.scrollLeft)).toBe(before);
   expect((await size.boundingBox()).height).toBeGreaterThanOrEqual(44);
-  expect(await size.evaluate(button => {
+  const unobscured = header => header.evaluate(button => {
     const box = button.getBoundingClientRect();
     return document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2)?.closest("button") === button;
-  })).toBe(true);
+  });
+  expect(await unobscured(size)).toBe(true);
   await page.locator("#storage-next").click();
   expect(await wrap.evaluate(element => element.scrollLeft)).toBe(before);
+  // A pointer sort leaves the scroll alone even where a keyboard one would move it.
+  await wrap.evaluate(element => { element.scrollLeft = 0; });
+  await clickColumn(page, "File");
+  expect(await wrap.evaluate(element => element.scrollLeft)).toBe(0);
+  // Tabbing through the headers must not stop under the sticky Action column.
+  await wrap.focus();
+  for (const name of ["File", "Output", "Created", "Files", "Size"]) {
+    await page.keyboard.press("Tab");
+    const header = page.getByRole("button", { name, exact: true });
+    await expect(header).toBeFocused();
+    expect(await unobscured(header), name).toBe(true);
+  }
 });
 
 test("Storage keeps showing a load in progress while searching, sorting or re-paging", async ({ page }) => {

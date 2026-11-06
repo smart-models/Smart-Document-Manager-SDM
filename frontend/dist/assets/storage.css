@@ -79,8 +79,6 @@
 .storage-confirm p { margin: .8rem 0; overflow-wrap: anywhere; }
 .storage-confirm-actions { display: flex; justify-content: end; flex-wrap: wrap; gap: .7rem; margin-top: 1.2rem; }
 @media (max-width: 700px) {
-  /* Tabbing through the headers must not stop under the sticky Action column. */
-  .storage-table-wrap { scroll-padding-right: 240px; }
   .storage-sort { min-height: 44px; }
   .storage-filters { grid-template-columns: 1fr 1fr; }
   .storage-workspace { grid-template-columns: 1fr; }

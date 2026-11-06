@@ -538,6 +538,12 @@ export function mountStorage(root, api) {
   find("search").addEventListener("input", () => { pageIndex = 0; displayRows(); });
   // Enter would submit the form and reload every archive for nothing.
   find("search").addEventListener("keydown", event => { if (event.key === "Enter") event.preventDefault(); });
+  // At phone width the sticky Action column covers half the table, and browsers
+  // count the part under it as visible, so they leave a tabbed-to header there.
+  // A pointer user already sees what they tapped: only keyboard focus scrolls.
+  list.addEventListener("focusin", event => {
+    if (event.target.matches(".storage-sort:focus-visible")) event.target.scrollIntoView({ block: "nearest", inline: "start" });
+  });
   // The page buttons disable at the ends: keep focus on the other one.
   find("next").addEventListener("click", () => { pageIndex++; displayRows(); if (find("next").disabled) find("prev").focus(); });
   find("prev").addEventListener("click", () => { pageIndex--; displayRows(); if (find("prev").disabled) find("next").focus(); });
