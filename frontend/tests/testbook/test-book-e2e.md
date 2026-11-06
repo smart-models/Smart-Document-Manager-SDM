@@ -265,11 +265,11 @@ Layer key: M = UI-mock · L = UI-live · B = Backend · S = Static.
 |---|---|---|---|
 | SDM-STO-001 | M | `storage.spec.mjs` | Browse files, safe preview, download, API authentication forwarded |
 | SDM-STO-002 | M | `storage.spec.mjs` | Current-layout archives labelled with filename + short code |
-| SDM-STO-003 | M | `storage.spec.mjs` | Filters, per-page search, explicit deletion confirmation preserved |
+| SDM-STO-003 | M | `storage.spec.mjs` | Filters, search across every page and visible column without a request, explicit deletion confirmation preserved |
 | SDM-STO-004 | M | `storage.spec.mjs` | Loading follows cursors past bounded-scan empty pages; corrupt archives reported without hiding readable ones |
 | SDM-STO-005 | M | `storage.spec.mjs` | Incomplete deletion reported with retry; OCR unavailable → storage outage state; refresh error survives successful deletion |
 | SDM-STO-006 | M | `storage.spec.mjs` | Mobile fit + keyboard-accessible controls; icon actions; file pagination keeps selection |
-| SDM-STO-007 | M | `storage.spec.mjs` | Every archive page loads once (limit 50) and pages locally; page size re-pages without a request; filters reload from the first cursor; delayed details preserve interaction |
+| SDM-STO-007 | M | `storage.spec.mjs` | Every archive page loads once (limit 50) and pages locally; page size re-pages without a request; filters reload from the first cursor; a load in progress or failed keeps its message while searching, sorting or re-paging; delayed details preserve interaction |
 | SDM-STO-008 | M | `storage.spec.mjs` | Parameter reference parity with Parse/OCR; local download errors reported; download completion names original archive; invalid dates cancel loading |
 | SDM-STO-009 | L | `storage-live.spec.mjs` | Real archive: browse → preview → download bytes equal → cancel preserves → confirm deletes → 404 (cleanup via `confirm: job_id`) |
 | SDM-STO-010 | L — excluded | see `coverage-contract.json` | Real retention/lifecycle expiry of an archived job |

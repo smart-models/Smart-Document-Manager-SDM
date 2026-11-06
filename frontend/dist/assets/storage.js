@@ -134,7 +134,7 @@ export function mountStorage(root, api) {
         <select id="storage-kind"><option value="">All outputs</option><option value="parse">Parse</option><option value="ocr">OCR</option></select></div>
       <div class="field"><label for="storage-date-from">From (UTC)</label><input id="storage-date-from" type="date" /></div>
       <div class="field"><label for="storage-date-to">To (UTC)</label><input id="storage-date-to" type="date" /></div>
-      <div class="field"><label for="storage-search">Search this page</label><input id="storage-search" type="search" placeholder="Job ID or output type" autocomplete="off" /></div>
+      <div class="field"><label for="storage-search">Search archives</label><input id="storage-search" type="search" placeholder="Any column" autocomplete="off" /></div>
       <button class="btn btn-primary" id="storage-refresh" type="submit">Refresh</button>
     </form>
     <p class="storage-status" id="storage-status" role="status"></p>
@@ -158,6 +158,8 @@ export function mountStorage(root, api) {
   const list = find("archives"), detail = find("detail"), status = find("status");
   const dialog = find("confirm");
   let active = false, archives = [], pageIndex = 0, sort = { key: "created", dir: -1 };
+  // Replaces the empty-table text while a load runs or after it failed.
+  let listNotice = null;
   let selected = null, pendingDelete = null, deleting = false, imageUrl = null;
   let listRequest = null, detailRequest = null, previewRequest = null, fileStatus = null;
   const downloads = new Set();
@@ -196,25 +198,31 @@ export function mountStorage(root, api) {
     pageIndex = 0; displayRows();
     list.querySelector(`[data-sort="${key}"]`).focus();
   }
+  // What a row shows, plus its storage prefix, so a search matches any column.
+  function searchText(row) {
+    const shown = row.incomplete ? ["Incomplete"] : [row.object_count, formatBytes(row.total_bytes)];
+    if (row.partial_ocr) shown.push("Partial OCR");
+    return [row.filename, row.job_id, row.kind, row.prefix, readableDate(row.created_at).text, ...shown].join(" ").toLowerCase();
+  }
   function displayRows() {
     const size = Number(find("page-size").value);
-    const pages = Math.max(1, Math.ceil(archives.length / size));
-    pageIndex = Math.min(pageIndex, pages - 1);
-    const rows = archives.slice().sort(compare).slice(pageIndex * size, (pageIndex + 1) * size);
     const query = find("search").value.trim().toLowerCase();
-    const visible = rows.filter(row => `${row.filename || ""} ${row.job_id} ${row.kind} ${row.prefix}`.toLowerCase().includes(query));
+    const matches = archives.filter(row => !query || searchText(row).includes(query)).sort(compare);
+    const pages = Math.max(1, Math.ceil(matches.length / size));
+    pageIndex = Math.min(pageIndex, pages - 1);
+    const rows = matches.slice(pageIndex * size, (pageIndex + 1) * size);
     const { wrapper, body } = tableView("Saved archives", ["File", "Output", "Created", "Files", "Size", "Action"],
       { keys: ["file", "kind", "created", "files", "size"], ...sort, onSort: sortBy });
     list.replaceChildren(wrapper);
     find("page-info").textContent = `Page ${pageIndex + 1} of ${pages}`;
     find("prev").disabled = pageIndex === 0;
     find("next").disabled = pageIndex === pages - 1;
-    if (!visible.length) {
-      const text = query ? "No matches on this page." : "No saved archives found. Run Parse or OCR, then refresh.";
+    if (!rows.length) {
+      const text = listNotice || (query ? "No matching archives." : "No saved archives found. Run Parse or OCR, then refresh.");
       const cell = node("td", text, "storage-empty"); cell.colSpan = 6;
       const line = node("tr"); line.append(cell); body.append(line);
     }
-    for (const row of visible) {
+    for (const row of rows) {
       const line = node("tr");
       line.classList.toggle("is-selected", selected?.prefix === row.prefix);
       const label = rowLabel(row);
@@ -289,7 +297,7 @@ export function mountStorage(root, api) {
     if (dateFrom && dateTo && dateFrom > dateTo) {
       // Stale rows would still be paged with the previous filter.
       listRequest?.abort(); clearDetail();
-      archives = []; pageIndex = 0; displayRows();
+      archives = []; pageIndex = 0; listNotice = null; displayRows();
       list.removeAttribute("aria-busy");
       find("refresh").disabled = false;
       message("From date must not be after To date.", true);
@@ -300,8 +308,7 @@ export function mountStorage(root, api) {
     const controller = listRequest = new AbortController();
     const reopen = keepSelection ? selected : null, page = keepSelection ? pageIndex : 0;
     clearDetail();
-    archives = []; displayRows();
-    list.querySelector("tbody td").textContent = "Loading saved archives…";
+    archives = []; listNotice = "Loading saved archives…"; displayRows();
     find("refresh").disabled = find("prev").disabled = find("next").disabled = true;
     message("Loading saved archives…");
     list.setAttribute("aria-busy", "true");
@@ -321,13 +328,12 @@ export function mountStorage(root, api) {
     list.removeAttribute("aria-busy");
     find("refresh").disabled = false;
     if (!result.ok || !Array.isArray(result.data?.items)) {
-      displayRows();
+      listNotice = "Saved files could not be loaded. Refresh to try again."; displayRows();
       message(failure(result, "Storage returned an unexpected response."), true);
-      list.querySelector("tbody td").textContent = "Saved files could not be loaded. Refresh to try again.";
       restoreFocus(held);
       return false;
     }
-    archives = loaded; pageIndex = page;
+    archives = loaded; pageIndex = page; listNotice = null;
     message(skipped ? `${skipped} archives still being written are not shown yet.` : "");
     displayRows();
     restoreFocus(held);
@@ -509,7 +515,7 @@ export function mountStorage(root, api) {
   find("filters").addEventListener("submit", event => { event.preventDefault(); loadArchives({ keepSelection: true }); });
   for (const name of ["kind", "date-from", "date-to"]) find(name).addEventListener("change", () => loadArchives());
   find("page-size").addEventListener("change", () => { pageIndex = 0; displayRows(); });
-  find("search").addEventListener("input", displayRows);
+  find("search").addEventListener("input", () => { pageIndex = 0; displayRows(); });
   // The page buttons disable at the ends: keep focus on the other one.
   find("next").addEventListener("click", () => { pageIndex++; displayRows(); if (find("next").disabled) find("prev").focus(); });
   find("prev").addEventListener("click", () => { pageIndex--; displayRows(); if (find("prev").disabled) find("next").focus(); });

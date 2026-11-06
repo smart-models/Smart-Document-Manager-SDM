@@ -117,7 +117,7 @@ test("Storage rows download the archived source under the uploaded name only whe
   }
 });
 
-test("Storage filters, searches this page, and preserves explicit deletion confirmation", async ({ page }) => {
+test("Storage filters, searches, and preserves explicit deletion confirmation", async ({ page }) => {
   const calls = await storageFixture(page);
   await openHealthyConsole(page, "#storage");
   await page.locator("#storage-kind").selectOption("parse");
@@ -135,7 +135,7 @@ test("Storage filters, searches this page, and preserves explicit deletion confi
   await page.locator("#storage-date-from").fill("2026-09-25");
   await expect(page.locator(".storage-archive")).toHaveCount(1);
   await page.locator("#storage-search").fill("missing");
-  await expect(page.locator("#storage-archives")).toContainText("No matches on this page");
+  await expect(page.locator("#storage-archives")).toContainText("No matching archives");
   await page.locator("#storage-search").fill("");
   await page.locator(".storage-archive").click();
   await page.locator("#storage-archives").getByRole("button", { name: /^Delete archive / }).click();
@@ -209,6 +209,17 @@ test.describe("Storage errors", () => {
     await page.locator("#storage-delete-confirm").click();
     await expect(page.locator("#storage-status")).toContainText("Archive deleted. Storage is unavailable");
     await expect(page.locator("#storage-refresh")).toBeEnabled();
+  });
+  test("keeps a failed load's message while searching and sorting", async ({ page }) => {
+    await page.route("**/storage/archives?**", route => route.fulfill({ status: 503, json: { detail: { code: "storage_unavailable" } } }));
+    await openHealthyConsole(page, "#storage");
+    const table = page.locator("#storage-archives tbody");
+    const failed = "Saved files could not be loaded. Refresh to try again.";
+    await expect(table).toHaveText(failed);
+    await page.locator("#storage-search").fill("missing");
+    await expect(table).toHaveText(failed);
+    await page.getByRole("button", { name: "Size", exact: true }).click();
+    await expect(table).toHaveText(failed);
   });
 });
 
@@ -387,6 +398,83 @@ test("Storage sorts every loaded archive by column, ascending then descending", 
   await expect(page.locator("#storage-archives th").last().getByRole("button")).toHaveCount(0);
 });
 
+test("Storage search covers every visible column of every page without asking the server", async ({ page }) => {
+  const rows = Array.from({ length: 25 }, (_, i) => archiveRow(25 - i, { object_count: 900 + i }));
+  rows[5] = { ...rows[5], total_bytes: 3 * 1024 * 1024 };
+  rows[16] = { ...rows[16], kind: "ocr" };
+  rows[21] = { ...rows[21], partial_ocr: true };
+  rows[23] = { ...rows[23], incomplete: true };
+  const calls = await routeArchives(page, rows);
+  await openHealthyConsole(page, "#storage");
+  const info = page.locator("#storage-page-info"), search = page.locator("#storage-search");
+  await expect(info).toHaveText("Page 1 of 3");
+  const loads = calls.length;
+  await page.locator("#storage-next").click();
+  await page.locator("#storage-next").click();
+  await expect(info).toHaveText("Page 3 of 3");
+
+  await search.fill("N7.PDF");
+  await expect(info).toHaveText("Page 1 of 1");
+  expect(await archiveNames(page)).toEqual(["n7.pdf"]);
+  await expect(page.locator("#storage-prev")).toBeDisabled();
+  await expect(page.locator("#storage-next")).toBeDisabled();
+  await expect(search).toBeFocused();
+
+  for (const [query, names] of [
+    ["2026-09-26 12:03", ["n3.pdf"]], // Created, as displayed
+    ["917", ["n8.pdf"]], // Files
+    ["3.0 mb", ["n20.pdf"]], // Size
+    ["partial", ["n4.pdf"]], // the Partial OCR badge
+    ["ocr", ["n9.pdf", "n4.pdf"]], // Output, and that badge again
+    ["incomplete", ["n2.pdf"]],
+  ]) {
+    await search.fill(query);
+    expect(await archiveNames(page), query).toEqual(names);
+  }
+  // An incomplete archive shows "—": its stored count is not a match.
+  await search.fill("923");
+  await expect(page.locator("#storage-archives tbody")).toHaveText("No matching archives.");
+
+  // Eleven matches page and sort like the whole list; a new query starts over.
+  await search.fill("n1");
+  await expect(info).toHaveText("Page 1 of 2");
+  expect((await archiveNames(page))[0]).toBe("n19.pdf");
+  await page.locator("#storage-next").click();
+  await expect(info).toHaveText("Page 2 of 2");
+  expect(await archiveNames(page)).toEqual(["n1.pdf"]);
+  await search.fill("n19");
+  await expect(info).toHaveText("Page 1 of 1");
+  await search.fill("n1");
+  await page.getByRole("button", { name: "File", exact: true }).click();
+  expect((await archiveNames(page)).slice(0, 2)).toEqual(["n1.pdf", "n10.pdf"]);
+  await search.fill("");
+  await expect(info).toHaveText("Page 1 of 3");
+  expect(calls).toHaveLength(loads);
+});
+
+test("Storage keeps showing a load in progress while searching, sorting or re-paging", async ({ page }) => {
+  let release, started;
+  const held = new Promise(resolve => { release = resolve; });
+  const pending = new Promise(resolve => { started = resolve; });
+  await page.route("**/storage/archives?**", async route => {
+    started(); await held;
+    await route.fulfill({ json: { items: [ROW], next_cursor: null, total: 1 } });
+  });
+  await openHealthyConsole(page, "#storage");
+  await pending;
+  const table = page.locator("#storage-archives tbody"), loading = "Loading saved archives…";
+  await expect(table).toHaveText(loading);
+  await page.locator("#storage-search").fill("missing");
+  await expect(table).toHaveText(loading);
+  await page.locator("#storage-search").fill("");
+  await page.getByRole("button", { name: "Size", exact: true }).click();
+  await expect(table).toHaveText(loading);
+  await page.locator("#storage-page-size").selectOption("20");
+  await expect(table).toHaveText(loading);
+  release();
+  await expect(page.locator(".storage-archive")).toHaveCount(1);
+});
+
 for (const interaction of ["typing in the filter", "scrolling the page"]) {
   test(`Storage delayed details preserve ${interaction}`, async ({ page }) => {
     const items = Array.from({ length: 12 }, (_, index) => ({
@@ -429,11 +517,14 @@ test("Storage has a parameter reference like Parse and OCR", async ({ page }) =>
   await expect(page.locator("#storage-reference")).toBeHidden();
   await reference.locator("summary").click();
   await expect(page.locator("#storage-reference .param-name")).toContainText([
-    "Output type", "From / To (UTC)", "Search this page", "Refresh", "Rows per page",
+    "Output type", "From / To (UTC)", "Search archives", "Refresh", "Rows per page",
     "Archive list", "Actions", "Files and preview", "Delete archive", "Availability",
   ]);
   await expect(page.locator("#storage-reference")).toContainText("unknown type appear only under All outputs");
   await expect(page.locator("#storage-reference")).toContainText("From / To (UTC)");
+  await expect(page.locator("#storage-reference")).toContainText("across every page");
+  await expect(page.locator("#storage-reference")).toContainText("Select a column header");
+  await expect(page.locator("#storage-reference")).not.toContainText("Changing the size reloads");
   await page.screenshot({ path: "test-results/storage-reference.png" });
 });
 
