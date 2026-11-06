@@ -1,7 +1,7 @@
 """Storage failures and indexed listing, with isolated S3 fakes."""
 
 import asyncio
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import httpx
 import pytest
@@ -21,6 +21,13 @@ from ocrserver.storage_index import (
 )
 from test_mcp_schema import FakePipeline, FakeRecognizer
 from test_storage_browser import MemoryS3, configured
+
+
+def entry_listings(s3):
+    """Count the listings of the temporal index recorded by the fake client."""
+    return len(
+        [c for op, c in s3.calls if op == "list" and c["Prefix"] == INDEX_ENTRIES]
+    )
 
 
 async def test_partial_deletion_cannot_produce_a_successful_incomplete_zip():
@@ -146,10 +153,8 @@ async def test_indexed_day_does_not_scan_50001_other_archives():
     browser = StorageBrowser(configured(), client=s3)
     response = await browser.archives(date_from="2026-09-26", date_to="2026-09-26")
     assert [r["prefix"] for r in response["items"]] == [target]
-    assert (
-        len([c for op, c in s3.calls if op == "list" and c["Prefix"] == INDEX_ENTRIES])
-        == 1
-    )
+    # Scanning the other 50001 entries would take at least 51 listings.
+    assert entry_listings(s3) <= 2
     empty = await browser.archives(date_from="2026-10-11", date_to="2026-10-11")
     assert empty["items"] == [] and empty["next_cursor"] is None
     await browser.close()
@@ -167,10 +172,7 @@ async def test_indexed_unfiltered_pages_do_not_scan_all_entries_and_skip_retenti
     s3.calls.clear()
     first = await browser.archives(limit=1)
     assert first["items"][0]["prefix"] == prefixes[1]
-    assert (
-        len([c for op, c in s3.calls if op == "list" and c["Prefix"] == INDEX_ENTRIES])
-        == 1
-    )
+    assert entry_listings(s3) == 1
     second = await browser.archives(limit=1, cursor=first["next_cursor"])
     assert second["items"][0]["prefix"] == prefixes[0]
     assert second["next_cursor"] is None
@@ -213,7 +215,7 @@ def test_backfill_prunes_vanished_archives_but_not_ones_being_written():
 
 def test_backfill_does_not_renew_existing_entries_past_retention():
     s3 = MemoryS3()
-    s3.archive(1)
+    prefix = s3.archive(1)
     rebuild_index(s3, "ocr-outputs")
     s3.calls.clear()
     rebuild_index(s3, "ocr-outputs")
@@ -222,6 +224,115 @@ def test_backfill_does_not_renew_existing_entries_past_retention():
         for op, call in s3.calls
         if op == "put" and call["Key"].startswith(INDEX_ENTRIES)
     ]
+    assert index_key(prefix) in s3.objects
+
+
+def test_backfill_writes_one_entry_per_archive():
+    s3 = MemoryS3()
+    s3.archive(1)
+    rebuild_index(s3, "ocr-outputs")
+    puts = [call["Key"] for op, call in s3.calls if op == "put"]
+    assert len([key for key in puts if key.startswith(INDEX_ENTRIES)]) == 1
+
+
+@pytest.mark.parametrize(
+    "age,pruned",
+    [
+        (timedelta(minutes=10), True),
+        (timedelta(minutes=10) - timedelta(microseconds=1), False),
+    ],
+)
+def test_orphan_window_is_exactly_ten_minutes(monkeypatch, age, pruned):
+    class Clock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return datetime(2026, 9, 26, 12, tzinfo=UTC) + age
+
+    monkeypatch.setattr("ocrserver.storage_index.datetime", Clock)
+    s3 = MemoryS3()
+    key = index_key("gone.pdf__20260926T120000000000Z__Gone123_/")
+    s3.objects[key] = b""
+    rebuild_index(s3, "ocr-outputs")
+    assert (key not in s3.objects) is pruned
+
+
+def test_backfill_prunes_orphans_in_batches_of_1000():
+    s3 = MemoryS3()
+    keys = [
+        index_key(f"gone{i}.pdf__20260925T120000000000Z__Gone123_/")
+        for i in range(2001)
+    ]
+    s3.objects.update(dict.fromkeys(keys, b""))
+    rebuild_index(s3, "ocr-outputs")
+    sizes = [len(c["Delete"]["Objects"]) for op, c in s3.calls if op == "delete"]
+    assert sizes == [1000, 1000, 1]
+    assert not any(key.startswith(INDEX_ENTRIES) for key in s3.objects)
+
+
+@pytest.mark.parametrize("name", ["bad", "x__zz", "x__00"])
+def test_backfill_prunes_unreadable_index_keys(name):
+    s3 = MemoryS3()
+    s3.objects[INDEX_ENTRIES + name] = b""
+    assert rebuild_index(s3, "ocr-outputs") == 0
+    assert INDEX_ENTRIES + name not in s3.objects
+    assert INDEX_READY in s3.objects
+
+
+@pytest.mark.parametrize(
+    "page",
+    [
+        {"Contents": [], "IsTruncated": True},
+        {
+            "Contents": [{"Key": INDEX_ENTRIES + "b"}, {"Key": INDEX_ENTRIES + "a"}],
+            "IsTruncated": False,
+        },
+    ],
+)
+def test_backfill_refuses_a_listing_that_does_not_advance(page):
+    class Stuck(MemoryS3):
+        def list_objects_v2(self, **kwargs):
+            return page
+
+    gone = index_key("gone.pdf__20260925T120000000000Z__Gone123_/")
+    s3 = Stuck()
+    s3.objects[gone] = b""
+    with pytest.raises(ValueError, match="did not advance"):
+        rebuild_index(s3, "ocr-outputs")
+    assert gone in s3.objects and INDEX_READY not in s3.objects
+
+
+async def test_delete_succeeds_when_unindexing_fails_and_backfill_prunes_later():
+    class Failing(MemoryS3):
+        fail = True
+
+        def delete_objects(self, **kwargs):
+            key = kwargs["Delete"]["Objects"][0]["Key"]
+            if self.fail and key.startswith(INDEX_ENTRIES):
+                raise RuntimeError("index unavailable")
+            return super().delete_objects(**kwargs)
+
+    s3 = Failing()
+    prefix = s3.archive(1)
+    rebuild_index(s3, "ocr-outputs")
+    browser = StorageBrowser(configured(), client=s3)
+    assert await browser.delete(prefix, f"{1:032x}") == {"deleted_objects": 3}
+    assert index_key(prefix) in s3.objects
+    await browser.close()
+    s3.fail = False
+    rebuild_index(s3, "ocr-outputs")
+    assert index_key(prefix) not in s3.objects
+
+
+async def test_partial_delete_keeps_the_index_entry():
+    s3 = MemoryS3()
+    prefix = s3.archive(1)
+    rebuild_index(s3, "ocr-outputs")
+    browser = StorageBrowser(configured(), client=s3)
+    s3.delete_errors.add(prefix + "document.md")
+    with pytest.raises(HTTPException):
+        await browser.delete(prefix, f"{1:032x}")
+    assert index_key(prefix) in s3.objects
+    await browser.close()
 
 
 def test_backfill_refuses_a_listing_outside_the_index():

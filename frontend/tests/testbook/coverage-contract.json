@@ -1,5 +1,5 @@
 {
-  "$comment": "Disposition registry for test-book-e2e.md cases that browser collection alone cannot express. It never maps a case to a test: mappings come from collected Playwright titles, collected node --test titles and the book's own executable column. `owners` name the suite whose cases must hold a marked executable entry. `exclusions` need a written reason of at least 40 characters and fail the gate as soon as the case gains evidence. `ratchet.maxUnassigned` may only be lowered.",
+  "$comment": "Disposition registry for test-book-e2e.md cases. testbook-coverage.test.mjs checks that every case has exactly one disposition and that the file named in the book's executable column exists. It does not check that a test in that file implements the case, so each row's scenario stays a claim a reviewer must verify. `owners` name the suite responsible for each case. `exclusions` need a written reason of at least 40 characters and fail the gate if the case is also owned. `ratchet.maxUnassigned` may only be lowered.",
   "ratchet": { "maxUnassigned": 0 },
   "owners": {
     "frontend-mock": [
