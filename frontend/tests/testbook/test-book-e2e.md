@@ -265,11 +265,11 @@ Layer key: M = UI-mock · L = UI-live · B = Backend · S = Static.
 |---|---|---|---|
 | SDM-STO-001 | M | `storage.spec.mjs` | Browse files, safe preview, download, API authentication forwarded |
 | SDM-STO-002 | M | `storage.spec.mjs` | Current-layout archives labelled with filename + short code |
-| SDM-STO-003 | M | `storage.spec.mjs` | Filters, search across every page and visible column without a request, explicit deletion confirmation preserved |
+| SDM-STO-003 | M | `storage.spec.mjs` | Filters, search across every page and visible column without a request, explicit deletion confirmation preserved; a confirmed deletion drops the row without a reload; Enter in the search does not reload |
 | SDM-STO-004 | M | `storage.spec.mjs` | Loading follows cursors past bounded-scan empty pages; corrupt archives reported without hiding readable ones |
-| SDM-STO-005 | M | `storage.spec.mjs` | Incomplete deletion reported with retry; OCR unavailable → storage outage state; refresh error survives successful deletion |
-| SDM-STO-006 | M | `storage.spec.mjs` | Mobile fit + keyboard-accessible controls; icon actions; file pagination keeps selection |
-| SDM-STO-007 | M | `storage.spec.mjs` | Every archive page loads once (limit 50) and pages locally; page size re-pages without a request; filters reload from the first cursor; a load in progress or failed keeps its message while searching, sorting or re-paging; delayed details preserve interaction |
+| SDM-STO-005 | M | `storage.spec.mjs` | Incomplete deletion reported with retry; OCR unavailable → storage outage state; a load failing part-way keeps its rows; a failed refresh returns to the viewed page; a repeated cursor stops the load |
+| SDM-STO-006 | M | `storage.spec.mjs` | Mobile fit + keyboard-accessible controls; rebuilt rows keep the scroll and an unobscured sort header; icon actions; file pagination keeps selection |
+| SDM-STO-007 | M | `storage.spec.mjs` | Every archive page loads once (limit 50) and pages locally; page size re-pages without a request; filters reload from the first cursor; Refresh stays on the page unless an action changes it meanwhile; load progress and archives still being written are reported; a load in progress or failed keeps its message while searching, sorting or re-paging; delayed details preserve interaction |
 | SDM-STO-008 | M | `storage.spec.mjs` | Parameter reference parity with Parse/OCR; local download errors reported; download completion names original archive; invalid dates cancel loading |
 | SDM-STO-009 | L | `storage-live.spec.mjs` | Real archive: browse → preview → download bytes equal → cancel preserves → confirm deletes → 404 (cleanup via `confirm: job_id`) |
 | SDM-STO-010 | L — excluded | see `coverage-contract.json` | Real retention/lifecycle expiry of an archived job |
@@ -355,7 +355,7 @@ zero network requests.
 | SDM-API-001 | B | `tests/test_api_*.py` | Endpoint auth, rate limiting, admission queues, payload guards |
 | SDM-API-002 | B | `tests/test_pdf_utils.py`, `test_office_utils.py`, `test_element_ocr.py` | PDF/image/Office validation, pixel budgets, LibreOffice conversion |
 | SDM-API-003 | B | `tests/test_chunk_*.py` | RAG chunking engine, runtime workers, schema parity, golden vectors |
-| SDM-API-004 | B | `tests/test_storage*.py`, `test_api_storage.py` | S3 bootstrap, IAM separation, archive browse/delete gates |
+| SDM-API-004 | B | `tests/test_storage*.py`, `test_api_storage.py` | S3 bootstrap, IAM separation, archive browse/delete gates, archive index reconcile |
 | SDM-API-005 | B | `tests/test_autotune*.py`, `test_calibration.py` | GPU tiers, fingerprint, CER gates, manifest hashes |
 | SDM-API-006 | B | `tests/test_stack_*.py`, `test_ci_workflow.py` | Launcher parity, compose security verifiers, CI contract |
 | SDM-API-007 | API-live — excluded | see `coverage-contract.json` | Live stack smoke: `scripts/verify_api_live.py` + `verify_rag_smoke.py` + `verify_storage_live.py` |

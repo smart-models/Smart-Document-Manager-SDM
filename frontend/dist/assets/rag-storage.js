@@ -1,5 +1,5 @@
 import { formatBytes } from "/assets/models.js?v=11";
-import { node, iconButton, tableView, readableDate, failure, downloadBlob } from "/assets/storage.js";
+import { node, iconButton, tableView, readableDate, failure, downloadBlob, archivePages } from "/assets/storage.js";
 import { isRagRefined, isRagListed } from "/assets/rag-names.js";
 
 export function mountRagStorage(root, api, { onSelect, onClear } = {}) {
@@ -137,19 +137,15 @@ export function mountRagStorage(root, api, { onSelect, onClear } = {}) {
     message("file-status", ""); message("status", "");
     find("refresh").disabled = true; find("files").setAttribute("aria-busy", "true");
     render();
-    let cursor = null, skipped = 0, unavailable = 0, firstError = "";
-    const cursors = new Set(), seen = new Set();
+    let skipped = 0, unavailable = 0, firstError = "";
+    const seen = new Set();
+    const filters = { date_from: dateFrom || undefined, date_to: dateTo || undefined };
     try {
-      do {
-        const result = await api.storageArchives({
-          date_from: dateFrom || undefined, date_to: dateTo || undefined,
-          cursor: cursor || undefined, limit: 50,
-        }, { signal });
-        if (signal.aborted || !active) return;
-        if (!result.ok || !Array.isArray(result.data?.items)) throw new Error(failure(result, "Unexpected archive listing."));
-        skipped += Number(result.data.skipped_archives) || 0;
+      for await (const listing of archivePages(api, filters, signal)) {
+        if (!active) return;
+        skipped += Number(listing.skipped_archives) || 0;
         // OCR archives never hold a json_rag.json (only parse results produce it).
-        const archives = result.data.items.filter(archive =>
+        const archives = listing.items.filter(archive =>
           !archive.incomplete && archive.kind !== "ocr" && !seen.has(archive.prefix));
         // Bound concurrent archive reads; never fetch file contents for the listing.
         for (let offset = 0; offset < archives.length; offset += 3) {
@@ -172,10 +168,8 @@ export function mountRagStorage(root, api, { onSelect, onClear } = {}) {
           });
           render();
         }
-        cursor = result.data.next_cursor || null;
-        if (cursor && cursors.has(cursor)) throw new Error("Archive pagination did not advance. Refresh to try again.");
-        if (cursor) cursors.add(cursor);
-      } while (cursor);
+      }
+      if (signal.aborted || !active) return;
       loadFailed = unavailable > 0;
       if (selectedKey && !rows.some(row => row.file.key === selectedKey)) {
         selectedKey = null;

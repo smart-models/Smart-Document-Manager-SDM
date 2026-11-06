@@ -25,7 +25,7 @@
 .storage-list, .storage-detail { min-width: 0; }
 .storage-table-wrap { width: 100%; overflow-x: auto; border: 1px solid var(--border-2); border-radius: 5px; }
 .storage-table { width: 100%; border: 0; border-collapse: separate; border-spacing: 0; font-size: .74rem; text-align: left; }
-.storage-table caption.storage-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.storage-sr-only, .storage-table caption.storage-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .storage-table th { color: var(--muted); font-weight: 500; font-size: .68rem; text-transform: uppercase; letter-spacing: .08em; white-space: nowrap; }
 .storage-table th, .storage-table td { padding: .7rem .8rem; border-bottom: 1px solid var(--border-2); vertical-align: middle; }
 .storage-table th { background: var(--panel-2); }
@@ -37,9 +37,9 @@
 .storage-table th:last-child, .storage-table td:last-child:not([colspan]) { position: sticky; right: 0; width: 1%; border-left: 1px solid var(--border-2); }
 .storage-table th:last-child { z-index: 1; }
 .storage-sort { display: inline-flex; align-items: center; gap: .35rem; padding: 0; margin: 0; background: none; border: 0; color: inherit; font: inherit; letter-spacing: inherit; text-transform: inherit; white-space: nowrap; cursor: pointer; transition: color .15s ease; }
-.storage-sort svg { width: 12px; height: 12px; flex: none; opacity: 0; pointer-events: none; transition: opacity .15s ease; }
+.storage-sort svg { width: 12px; height: 12px; flex: none; opacity: .8; pointer-events: none; transition: opacity .15s ease; }
 .storage-sort:hover, .storage-sort:focus-visible { color: var(--ink); }
-.storage-sort:hover svg, .storage-sort:focus-visible svg { opacity: .55; }
+.storage-sort:hover svg, .storage-sort:focus-visible svg { opacity: 1; }
 .storage-table th[aria-sort] .storage-sort { color: var(--blue); }
 .storage-table th[aria-sort] .storage-sort svg { opacity: 1; }
 .storage-name { display: block; border: 0; background: none; color: var(--ink); font: inherit; text-align: left; cursor: pointer; padding: .35rem 0; overflow-wrap: anywhere; min-width: 11rem; max-width: 28rem; }
@@ -79,6 +79,9 @@
 .storage-confirm p { margin: .8rem 0; overflow-wrap: anywhere; }
 .storage-confirm-actions { display: flex; justify-content: end; flex-wrap: wrap; gap: .7rem; margin-top: 1.2rem; }
 @media (max-width: 700px) {
+  /* Tabbing through the headers must not stop under the sticky Action column. */
+  .storage-table-wrap { scroll-padding-right: 240px; }
+  .storage-sort { min-height: 44px; }
   .storage-filters { grid-template-columns: 1fr 1fr; }
   .storage-workspace { grid-template-columns: 1fr; }
   .storage-detail { padding: .9rem; }

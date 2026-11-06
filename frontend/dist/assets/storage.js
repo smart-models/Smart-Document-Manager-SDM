@@ -115,6 +115,50 @@ function failure(result, fallback, action = "") {
 
 export { node, iconButton, tableView, readableDate, failure };
 
+// Follow every cursor of an archive listing, yielding each page's response body.
+// Ends quietly once `signal` aborts. Throws a displayable Error on a failed or
+// malformed response, and on a repeated cursor, which would otherwise never end.
+export async function* archivePages(api, filters, signal) {
+  const cursors = new Set();
+  let cursor;
+  do {
+    const result = await api.storageArchives({ ...filters, cursor, limit: 50 }, { signal });
+    if (signal.aborted) return;
+    if (!result.ok || !Array.isArray(result.data?.items)) throw new Error(failure(result, "Storage returned an unexpected response."));
+    yield result.data;
+    cursor = result.data.next_cursor || undefined;
+    if (cursors.has(cursor)) throw new Error("Archive pagination did not advance. Refresh to try again.");
+    cursors.add(cursor);
+  } while (cursor);
+}
+
+const natural = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+// The value each sortable column orders by, in column order; null means missing.
+const SORT_VALUES = {
+  file: row => row.filename || row.job_id,
+  kind: row => row.kind,
+  created: row => { const time = Date.parse(row.created_at); return Number.isNaN(time) ? null : time; },
+  files: row => row.incomplete ? null : row.object_count,
+  size: row => row.incomplete ? null : row.total_bytes,
+};
+
+// What an archive row displays beyond its name and kind, shared by its cells and
+// the search so the two cannot disagree.
+function rowFacts(row) {
+  return {
+    created: readableDate(row.created_at),
+    files: row.incomplete ? "—" : String(row.object_count),
+    size: row.incomplete ? "—" : formatBytes(row.total_bytes),
+    marks: [row.partial_ocr && "Partial OCR", row.incomplete && "Incomplete"].filter(Boolean),
+  };
+}
+
+// Everything a search matches: what the row shows, plus its storage prefix.
+function searchText(row) {
+  const { created, files, size, marks } = rowFacts(row);
+  return [row.filename, row.job_id, row.kind, row.prefix, created.text, files, size, ...marks].join(" ").toLowerCase();
+}
+
 export function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob), link = node("a");
   link.href = url; link.download = filename;
@@ -143,6 +187,7 @@ export function mountStorage(root, api) {
         <nav class="storage-pagination" aria-label="Archive pagination">
           <label>Rows per page <select id="storage-page-size"><option selected>10</option><option>20</option><option>50</option></select></label>
           <span id="storage-page-info" role="status"></span>
+          <span id="storage-search-status" class="storage-sr-only" role="status"></span>
           <div class="storage-page-buttons"><button type="button" class="btn" id="storage-prev" disabled>Previous</button><button type="button" class="btn" id="storage-next" disabled>Next</button></div>
         </nav>
       </div>
@@ -179,14 +224,6 @@ export function mountStorage(root, api) {
     detail.replaceChildren(node("p", "Select an archive to view its files.", "storage-empty"));
   }
   // Missing values sort last either way; ties keep the server's newest-first order.
-  const natural = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
-  const SORT_VALUES = {
-    file: row => row.filename || row.job_id,
-    kind: row => row.kind,
-    created: row => { const time = Date.parse(row.created_at); return Number.isNaN(time) ? null : time; },
-    files: row => row.incomplete ? null : row.object_count,
-    size: row => row.incomplete ? null : row.total_bytes,
-  };
   function compare(a, b) {
     const x = SORT_VALUES[sort.key](a), y = SORT_VALUES[sort.key](b);
     if (x === null || y === null) return (x === null) - (y === null);
@@ -196,27 +233,27 @@ export function mountStorage(root, api) {
   function sortBy(key) {
     sort = { key, dir: sort.key === key ? -sort.dir : 1 };
     pageIndex = 0; displayRows();
-    list.querySelector(`[data-sort="${key}"]`).focus();
   }
-  // What a row shows, plus its storage prefix, so a search matches any column.
-  function searchText(row) {
-    const shown = row.incomplete ? ["Incomplete"] : [row.object_count, formatBytes(row.total_bytes)];
-    if (row.partial_ocr) shown.push("Partial OCR");
-    return [row.filename, row.job_id, row.kind, row.prefix, readableDate(row.created_at).text, ...shown].join(" ").toLowerCase();
-  }
+  // Render the current page of the sorted archives matching the search. The table
+  // is rebuilt, so carry over the focused sort header and the horizontal scroll.
   function displayRows() {
     const size = Number(find("page-size").value);
     const query = find("search").value.trim().toLowerCase();
     const matches = archives.filter(row => !query || searchText(row).includes(query)).sort(compare);
     const pages = Math.max(1, Math.ceil(matches.length / size));
-    pageIndex = Math.min(pageIndex, pages - 1);
-    const rows = matches.slice(pageIndex * size, (pageIndex + 1) * size);
+    // A notice means the list is empty for now: keep pageIndex to return to it.
+    const page = Math.min(pageIndex, pages - 1);
+    if (!listNotice) pageIndex = page;
+    const rows = matches.slice(page * size, (page + 1) * size);
+    const scrollLeft = list.firstElementChild?.scrollLeft || 0;
+    const focusedSort = document.activeElement?.dataset?.sort;
     const { wrapper, body } = tableView("Saved archives", ["File", "Output", "Created", "Files", "Size", "Action"],
-      { keys: ["file", "kind", "created", "files", "size"], ...sort, onSort: sortBy });
+      { keys: Object.keys(SORT_VALUES), ...sort, onSort: sortBy });
     list.replaceChildren(wrapper);
-    find("page-info").textContent = `Page ${pageIndex + 1} of ${pages}`;
-    find("prev").disabled = pageIndex === 0;
-    find("next").disabled = pageIndex === pages - 1;
+    find("page-info").textContent = `Page ${page + 1} of ${pages}`;
+    find("search-status").textContent = query && !listNotice ? `${matches.length} ${matches.length === 1 ? "match" : "matches"}` : "";
+    find("prev").disabled = page === 0;
+    find("next").disabled = page === pages - 1;
     if (!rows.length) {
       const text = listNotice || (query ? "No matching archives." : "No saved archives found. Run Parse or OCR, then refresh.");
       const cell = node("td", text, "storage-empty"); cell.colSpan = 6;
@@ -225,7 +262,7 @@ export function mountStorage(root, api) {
     for (const row of rows) {
       const line = node("tr");
       line.classList.toggle("is-selected", selected?.prefix === row.prefix);
-      const label = rowLabel(row);
+      const label = rowLabel(row), facts = rowFacts(row);
       const name = node("td"), kind = node("td");
       if (row.incomplete) {
         // An abandoned write: nothing to open or download, only to delete.
@@ -239,8 +276,7 @@ export function mountStorage(root, api) {
       }
       if (row.filename) name.append(node("small", `id: ${row.job_id}`, "storage-job-code"));
       kind.append(node("span", row.kind, "storage-kind"));
-      if (row.partial_ocr) kind.append(node("span", "Partial OCR", "storage-partial"));
-      if (row.incomplete) kind.append(node("span", "Incomplete", "storage-partial"));
+      for (const mark of facts.marks) kind.append(node("span", mark, "storage-partial"));
       const actions = node("td"), controls = node("div", "", "storage-actions");
       if (!row.incomplete) {
         const open = iconButton("open", `Open archive ${label}`, "", "Open");
@@ -257,14 +293,14 @@ export function mountStorage(root, api) {
       const remove = iconButton("delete", `Delete archive ${label}`, "storage-danger", "Delete");
       remove.addEventListener("click", () => confirmDelete(row));
       controls.append(remove); actions.append(controls);
-      const created = readableDate(row.created_at);
-      const date = node("td", created.text, "storage-date-cell");
-      if (created.title) date.title = created.title;
-      line.append(name, kind, date,
-        node("td", row.incomplete ? "—" : String(row.object_count), "storage-number"),
-        node("td", row.incomplete ? "—" : formatBytes(row.total_bytes), "storage-number"), actions);
+      const date = node("td", facts.created.text, "storage-date-cell");
+      if (facts.created.title) date.title = facts.created.title;
+      line.append(name, kind, date, node("td", facts.files, "storage-number"), node("td", facts.size, "storage-number"), actions);
       body.append(line);
     }
+    // After the rows: an empty table would clamp the scroll back to zero.
+    wrapper.scrollLeft = scrollLeft;
+    if (focusedSort) list.querySelector(`[data-sort="${focusedSort}"]`).focus({ preventScroll: true });
   }
   function rowLabel(row) {
     return row.filename ? `${row.filename} (${row.job_id})` : row.job_id;
@@ -274,72 +310,56 @@ export function mountStorage(root, api) {
     const stored = row.input_key.split("/").pop();
     return row.filename ? row.filename.replace(/\.[^.]*$/, "") + stored.slice(stored.lastIndexOf(".")) : stored;
   }
-  // Loading disables the pagination and Refresh buttons; the one that held
-  // focus hands it to the list instead of dropping it on <body>.
-  function holdFocus() {
-    const active = document.activeElement;
-    return ["prev", "next", "refresh"].some(id => find(id) === active) ? active : null;
-  }
-  function restoreFocus(held) {
-    if (!held || document.activeElement !== document.body) return;
-    const target = !held.disabled ? held
-      : held === find("next") && !find("prev").disabled ? find("prev")
-        : held === find("prev") && !find("next").disabled ? find("next") : find("page-info");
-    if (target === find("page-info")) target.tabIndex = -1;
-    target.focus({ preventScroll: true });
-  }
-  // Every column sorts all archives of the filters, so a load follows every
-  // cursor and the console pages locally.
-  // ponytail: each load reads every manifest in range (~18 ms per archive);
-  // move sorting server-side if archives reach the thousands.
+  // Load every archive of the filters, so any column can sort them all and the
+  // console pages locally. With keepSelection (Refresh) stay on the viewed page
+  // and reopen the open archive. A page that fails keeps the rows already loaded.
+  // ponytail: each load reads every manifest in range (4.6 s measured for 257
+  // archives); move sorting server-side if archives reach the thousands.
   async function loadArchives({ keepSelection = false } = {}) {
     const dateFrom = find("date-from").value, dateTo = find("date-to").value;
+    if (!keepSelection) pageIndex = 0;
     if (dateFrom && dateTo && dateFrom > dateTo) {
       // Stale rows would still be paged with the previous filter.
+      const invalid = "From date must not be after To date.";
       listRequest?.abort(); clearDetail();
-      archives = []; pageIndex = 0; listNotice = null; displayRows();
+      archives = []; listNotice = invalid; displayRows();
       list.removeAttribute("aria-busy");
       find("refresh").disabled = false;
-      message("From date must not be after To date.", true);
-      return false;
+      message(invalid, true);
+      return;
     }
-    const held = holdFocus();
+    // Loading disables Refresh: hand focus back instead of dropping it on <body>.
+    const held = document.activeElement === find("refresh");
     listRequest?.abort();
     const controller = listRequest = new AbortController();
-    const reopen = keepSelection ? selected : null, page = keepSelection ? pageIndex : 0;
+    const reopen = keepSelection ? selected : null;
     clearDetail();
     archives = []; listNotice = "Loading saved archives…"; displayRows();
-    find("refresh").disabled = find("prev").disabled = find("next").disabled = true;
-    message("Loading saved archives…");
+    find("refresh").disabled = true;
+    message(listNotice);
     list.setAttribute("aria-busy", "true");
     const filters = { kind: find("kind").value || undefined, date_from: dateFrom || undefined, date_to: dateTo || undefined };
     const loaded = [];
-    let cursor, skipped = 0, result;
-    do {
-      result = await api.storageArchives({ ...filters, cursor, limit: 50 }, { signal: controller.signal });
-      if (controller.signal.aborted || !active) return;
-      if (!result.ok || !Array.isArray(result.data?.items)) break;
-      loaded.push(...result.data.items);
-      skipped += Number(result.data.skipped_archives) || 0;
-      cursor = result.data.next_cursor || undefined;
-      const total = Number.isInteger(result.data.total) ? ` of ${result.data.total}` : "";
-      if (cursor) message(`Loading saved archives… ${loaded.length}${total}`);
-    } while (cursor);
+    let skipped = 0, error = "";
+    try {
+      for await (const listing of archivePages(api, filters, controller.signal)) {
+        loaded.push(...listing.items);
+        skipped += Number(listing.skipped_archives) || 0;
+        if (listing.next_cursor) message(`Loading saved archives… ${loaded.length}`);
+      }
+    } catch (failed) { error = failed.message; }
+    // A newer load or leaving the tab (deactivate aborts too) owns the list now.
+    if (controller.signal.aborted) return;
     list.removeAttribute("aria-busy");
     find("refresh").disabled = false;
-    if (!result.ok || !Array.isArray(result.data?.items)) {
-      listNotice = "Saved files could not be loaded. Refresh to try again."; displayRows();
-      message(failure(result, "Storage returned an unexpected response."), true);
-      restoreFocus(held);
-      return false;
-    }
-    archives = loaded; pageIndex = page; listNotice = null;
-    message(skipped ? `${skipped} archives still being written are not shown yet.` : "");
+    archives = loaded;
+    listNotice = error && !loaded.length ? "Saved files could not be loaded. Refresh to try again." : null;
+    if (error) message(loaded.length ? `Listing incomplete. ${error} Refresh to retry.` : error, true);
+    else message(skipped ? `${skipped} archives still being written are not shown yet.` : "");
     displayRows();
-    restoreFocus(held);
+    if (held && document.activeElement === document.body) find("refresh").focus({ preventScroll: true });
     const again = reopen && archives.find(row => row.prefix === reopen.prefix);
     if (again) selectArchive(again, { moveFocus: false });
-    return true;
   }
   function confirmDelete(row) {
     pendingDelete = row;
@@ -516,6 +536,8 @@ export function mountStorage(root, api) {
   for (const name of ["kind", "date-from", "date-to"]) find(name).addEventListener("change", () => loadArchives());
   find("page-size").addEventListener("change", () => { pageIndex = 0; displayRows(); });
   find("search").addEventListener("input", () => { pageIndex = 0; displayRows(); });
+  // Enter would submit the form and reload every archive for nothing.
+  find("search").addEventListener("keydown", event => { if (event.key === "Enter") event.preventDefault(); });
   // The page buttons disable at the ends: keep focus on the other one.
   find("next").addEventListener("click", () => { pageIndex++; displayRows(); if (find("next").disabled) find("prev").focus(); });
   find("prev").addEventListener("click", () => { pageIndex--; displayRows(); if (find("prev").disabled) find("next").focus(); });
@@ -529,13 +551,14 @@ export function mountStorage(root, api) {
     try {
       const result = await api.deleteStorageArchive(pendingDelete.prefix, pendingDelete.job_id);
       if (!result.ok) { find("confirm-error").textContent = failure(result, "Deletion failed. Some files may remain; retry or refresh."); return; }
-      // Stay on this page; keep another archive's files open.
+      // Drop the row instead of reloading every archive: stay on this page and
+      // keep another archive's files open.
       const removed = pendingDelete.prefix;
       dialog.close(); pendingDelete = null;
       if (selected?.prefix === removed) clearDetail();
-      const refreshed = await loadArchives({ keepSelection: true });
+      archives = archives.filter(row => row.prefix !== removed); displayRows();
       if (active) {
-        message(refreshed ? "Archive deleted." : `Archive deleted. ${status.textContent}`, !refreshed);
+        message("Archive deleted.");
         find("refresh").focus();
       }
     } finally { deleting = false; find("cancel").disabled = find("delete-confirm").disabled = false; }

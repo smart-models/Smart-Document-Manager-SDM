@@ -46,7 +46,7 @@ as native ES modules and baked into the `ocr-api` image (`/app/frontend/dist`).
 | `dist/index.html` | Single-page console markup and CSP-compatible asset entry | Console layout, tabs, or landmarks change |
 | `dist/assets/app.js`, `api.js`, `models.js`, `ui.js`, `viewer.js`, `math.js` | Core console controller, API client, state models, document viewer, and KaTeX math rendering | Console OCR/parse/monitoring interactions change |
 | `dist/assets/rag.js`, `rag-names.js`, `rag-partition.js`, `rag-preflight.js`, `rag-repair.js`, `rag-selection.js`, `rag-storage.js`, `rag-structure.js` | Client-side RAG workspace: chunk inspection, preflight, section structure, and manual split/refine workflows | RAG tab behavior or client-side chunk helpers change |
-| `dist/assets/storage.js` | S3 archive browser, download, and confirmation-gated deletion UI | Storage tab behavior changes |
+| `dist/assets/storage.js` | S3 archive browser (loads every cursor page once, then sorts, searches and pages locally), download, confirmation-gated deletion UI, and the `archivePages` listing walk shared with the RAG tab | Storage tab behavior changes |
 | `dist/assets/style.css`, `ocr.css`, `rag.css`, `storage.css` | Console stylesheets | Console visual styling or responsive layout changes |
 | `dist/assets/fonts/`, `dist/assets/vendor/` | Self-hosted WOFF2 fonts and vendored KaTeX, Marked, DOMPurify, and PDF.js | Vendored library versions change (update `verify_frontend_assets.py` together) |
 | `tests/*.test.mjs` | 8 Node unit test files (`models`, `monitor-validation`, `playwright-config`, `rag-names`, `rag-partition`, `rag-preflight`, `rag-repair`, `rag-structure`) | Pure JS logic in `dist/assets/` changes |
@@ -96,6 +96,16 @@ Run all commands from `frontend/`:
   or `—` for servers that do not send it.
 - A selected json_rag whose `metadata.unprocessed_pages` is non-empty gets a
   `partial` tile in the RAG tab.
+- The STORAGE tab loads every `GET /storage/archives` cursor page of the current
+  filters (`limit=50`, with progress in the status line) when the tab opens, a
+  filter changes or Refresh runs. Everything else works on those rows without a
+  request: page size, Previous/Next, column sort (File in natural order, rows
+  without a value last, ties newest first, Created descending by default),
+  Search archives (any visible column plus the storage prefix) and dropping a row
+  after a confirmed deletion. Refresh stays on the viewed page; a filter or
+  opening the tab returns to the first. A failed cursor page keeps the rows
+  already loaded and reports the list as incomplete; a repeated cursor stops the
+  walk instead of looping.
 - Live specs (`*-live.spec.mjs`) are excluded from the default `mock` project
   and run only when `--project=live` is explicitly selected (`tests/playwright-config.test.mjs`
   enforces this separation).
@@ -115,7 +125,9 @@ Run all commands from `frontend/`:
 
 **You cannot:** use TypeScript/JSX or npm runtime imports inside `dist/assets/*.js`
 without vendoring them under `dist/assets/vendor/` and registering their hashes
-in `scripts/verify_frontend_assets.py`.
+in `scripts/verify_frontend_assets.py`, or keep the STORAGE tab's load time flat
+as archives grow: each load reads every manifest in range (4.6 s measured for 257
+archives), so archives in the thousands need server-side sorting first.
 
 ## Recipes
 
