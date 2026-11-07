@@ -56,6 +56,7 @@ by the operator via `python scripts/configure_storage.py` before starting the
 | `bootstrap.py` | `storage-init` entrypoint: waits for SeaweedFS, creates bucket, reconciles `ocr-writer`, `ocr-reader`, `ocr-browser` IAM users/policies, configures retention lifecycle, and rebuilds the archive index | IAM policies, bucket lifecycle rules, or bootstrap verification change |
 | `nginx.conf` | Unprivileged nginx reverse proxy for S3 (`8333`), admin console (`23646`), and local `/healthz` (`127.0.0.1:8334`) | Gateway timeouts, `client_max_body_size` (`144m`), or proxy headers change |
 | `start.sh` | Pre-entrypoint shell guard for `seaweedfs` verifying required admin/console environment variables | SeaweedFS container startup prerequisites change |
+| [`../scripts/split_archive_markdown.py`](../scripts/split_archive_markdown.py) | Operator CLI that rewrites archives written before `archive_schema_version` 3 to the current Markdown layout in place: `document.md` becomes `<stem>.md` plus one `document/<stem>_pNNNN.md` per page, told apart by aligning the OCR blocks of `json_ocr.json` with the Markdown paragraphs; dry run by default, `--apply` writes | The archive Markdown layout or the manifest inventory changes |
 | [`../scripts/configure_storage.py`](../scripts/configure_storage.py) | Operator CLI helper that populates missing `OCR_S3_*` / `OCR_SEAWEED_*` secrets in `.env` and adds `storage` to `COMPOSE_PROFILES` | Required storage secret names or defaults change |
 | [`../ocrserver/storage.py`](../ocrserver/storage.py), [`../ocrserver/storage_browser.py`](../ocrserver/storage_browser.py), [`../ocrserver/storage_index.py`](../ocrserver/storage_index.py) | API-side writer, browser/delete routes, and S3 archive index | Archive object layout or `/storage/*` API behavior changes |
 | [`../tests/test_storage_setup.py`](../tests/test_storage_setup.py), [`../tests/test_storage.py`](../tests/test_storage.py), [`../tests/test_api_storage.py`](../tests/test_api_storage.py), [`../tests/test_storage_browser.py`](../tests/test_storage_browser.py), [`../tests/test_storage_guards.py`](../tests/test_storage_guards.py) | Offline unit tests for `bootstrap.py`, `configure_storage.py`, `ArtifactStore`, `/storage/*` routes, and the archive index reconcile | Any storage bootstrap, API, or index change |
@@ -114,7 +115,10 @@ Defined in `.env.example` Sections 12 and 13:
 ## Capabilities and limits
 
 **You can:** provision idempotent bucket/IAM/retention state on every `up`,
-reconcile the archive index on every `up`, rotate managed S3 keys by updating `.env` and re-running `up`, and isolate S3
+reconcile the archive index on every `up`, rotate managed S3 keys by updating `.env` and re-running `up`, split the
+joined `document.md` of older archives into per-page Markdown with
+`scripts/split_archive_markdown.py` (the manifest's `migration` field records
+it; page files carry whole paragraphs, exact at paragraph boundaries), and isolate S3
 traffic on the internal `smart-document-manager-storage` bridge network.
 
 **You cannot:** pass `OCR_S3_ADMIN_*` to `ocr-api` (blocked by
@@ -138,13 +142,29 @@ bash stack.sh verify
 bash stack.sh up --wait
 ```
 
+**Split the Markdown of archives written before schema 3 into one file per
+page, in place** (the stack's `storage` profile must be running; the dry run
+lists what every archive would get, `--apply` writes the new objects, commits
+the manifest under an ETag guard and deletes `document.md` last, so a rerun
+finishes an interrupted archive and skips a finished one; an archive whose
+pages cannot be told apart unambiguously is reported and left untouched):
+
+```powershell
+python scripts/split_archive_markdown.py
+python scripts/split_archive_markdown.py --apply
+```
+
+```bash
+python3 scripts/split_archive_markdown.py --apply --prefix '<archive prefix>/'
+```
+
 ## Verification
 
 Run the offline storage bootstrap, verifier, and API storage suites from the
 repository root:
 
 ```powershell
-python -m pytest tests/test_storage_setup.py tests/test_storage.py tests/test_api_storage.py tests/test_storage_browser.py tests/test_storage_guards.py tests/test_mcp_storage.py -q
+python -m pytest tests/test_storage_setup.py tests/test_storage.py tests/test_api_storage.py tests/test_storage_browser.py tests/test_storage_guards.py tests/test_mcp_storage.py tests/test_split_archive_markdown.py -q
 python scripts/verify_compose_security.py --env-file .env.example
 ```
 
