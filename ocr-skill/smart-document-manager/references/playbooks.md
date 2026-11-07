@@ -168,7 +168,7 @@ The detail from `ocr_get_storage_archive` already carries the manifest and the
 | What it says, a summary, a value, a table, a quote | `json_ocr.json` (`parsed.json` in a `parse-chunks` archive), read with `smart-document-reader` | `ocr_download_storage_file`, `preview=true`; `preview=false` only over 1 MiB |
 | Chunks for RAG, or a refinement | `json_rag.json`, `sha256` from `files[]` | `preview=true` to read; `preview=false` before a refinement (its playbook) |
 | What a figure, chart or stamp shows | its caption and block `bbox` in `json_ocr.json`; `manifest.images[]` maps each image reference, named by block type and bbox, to `images/pNNNN-NNNN.png` | download the crop: it comes back as an image to look at |
-| One page's text, when the page is known | `document/<stem>_pNNNN.md`, one page each (`manifest.pages` counts them; a page in error has none) | `preview=true` |
+| One page's text, or which pages exist | `document/<stem>_pNNNN.md`, one page each: the `files[]` names under `document/`, already in reading order; a page in error has none, so count those names, not `manifest.pages` | `preview=true` |
 | An `ocr` archive (`manifest.kind`) | `<stem>.md` (see `smart-document-reader`) | `preview=true` |
 
 `files[].size` decides how much text one reading can hold:
@@ -185,8 +185,10 @@ The detail from `ocr_get_storage_archive` already carries the manifest and the
 4. Beyond that, or whenever the question names a page: `document/<stem>_pNNNN.md`
    holds one page each (`NNNN` the 1-based page number, zero-padded), the same
    text with crops linked as `../images/...`, so a page is cited by its file
-   name; read the pages the question needs, never all of them. Archives before schema 3 (`archive_schema_version`)
-   have only an unsplit `document.md`.
+   name. The names come from `files[]` in the detail, never built from
+   `manifest.pages`; read the pages the question needs, never all of them.
+   Archives before schema 3 (`archive_schema_version`) have only an unsplit
+   `document.md`.
 5. Otherwise one reading cannot hold the text: say so and offer a new parse
    with `json_rag=true` and `max_pages` on the leading pages that matter, or
    the console.

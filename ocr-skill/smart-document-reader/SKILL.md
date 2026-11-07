@@ -51,7 +51,9 @@ unknown, not none.
 `<stem>.md` of a parse joins the page markdowns, image references rewritten to
 `images/pNNNN-NNNN.png` as `manifest.images[]` maps them; `document/<stem>_pNNNN.md`
 holds one page each (1-based, zero-padded; none for a page in error; crops linked as
-`../images/...`), `<stem>` being the archive folder's filename without its extension. Read the page files when a page
+`../images/...`), `<stem>` being the archive folder's filename without its extension. The
+page files are the `files[]` names under `document/` in the archive detail, already in
+reading order: list them from there, never from `manifest.pages`. Read them when a page
 is known, the whole file when the JSON is too large; archives before schema 3
 (`archive_schema_version`) have only an unsplit `document.md`. The PNGs are unread crops.
 `json_rag.json` is the chunk export, `json_rag_<job>_<n>.json` later refinements:
