@@ -140,8 +140,9 @@ asking again.
   `partial_ocr`, `incomplete` and `skipped_archives`.
 - Let the question and `files[].size` choose the file (`playbooks.md`): the detail
   already carries the manifest; read `json_ocr.json` whole up to the playbook's
-  size step, else `json_rag.json` when present, else `document.md`, each loss
-  stated. `preview=true` returns a whole file up to 1 MiB; `preview=false` beyond.
+  size step, else `json_rag.json` when present, else `<stem>.md` or
+  `document/<stem>_pNNNN.md`, each loss stated. `preview=true` returns whole
+  files up to 1 MiB; `preview=false` beyond.
   ZIP and `input.<ext>` are for saving, not reading.
 - Delete nothing without an explicit yes given after the user has seen the exact
   target: show `filename`, `kind`, `created_at`, size and the `job_id` or file

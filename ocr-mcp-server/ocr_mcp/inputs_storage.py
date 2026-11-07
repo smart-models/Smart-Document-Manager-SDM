@@ -68,7 +68,7 @@ class DownloadStorageFileInput(ToolInput):
         max_length=1024,
         description=(
             "Artifact key copied from archive details (e.g. "
-            "'invoice.pdf__20261018T120000000000Z__job123AB/document.md')"
+            "'invoice.pdf__20261018T120000000000Z__job123AB/invoice.md')"
         ),
     )
     preview: bool = Field(

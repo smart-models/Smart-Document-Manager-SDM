@@ -71,7 +71,7 @@ async def test_success_commits_inventory_last_without_saving_input():
     assert manifest["source"]["sha256"] == (
         "0682c5f2076f099c34cfdd15a9e063849ed437a49677e6fcc5b4198c76575be5"
     )
-    assert [entry["name"] for entry in manifest["artifacts"]] == ["document.md"]
+    assert [entry["name"] for entry in manifest["artifacts"]] == ["input.md"]
     from ocrserver.storage_index import index_archive
 
     assert index_archive(client.objects[0]["Key"]) == outcome.manifest_key.removesuffix(
@@ -124,7 +124,7 @@ async def test_code_collision_retries_without_overwriting_existing_objects(
     assert outcome.manifest_key.split("__")[-1] == "Unique_2/manifest.json"
     assert client.objects[-1]["Key"] == outcome.manifest_key
     assert not any(
-        item["Key"].endswith("Collide1/document.md") for item in client.objects
+        item["Key"].endswith("Collide1/invoice.md") for item in client.objects
     )
 
 
@@ -435,7 +435,7 @@ async def test_archive_keeps_outputs_and_warns_when_the_input_does_not_fit():
         await store.close()
     assert outcome.status == "stored"
     names = {item["Key"].rsplit("/", 1)[-1] for item in client.objects}
-    assert "document.md" in names and "input.png" not in names
+    assert "input.md" in names and "input.png" not in names
     manifest = json.loads(
         [i for i in client.objects if i["Key"].endswith("/manifest.json")][-1]["Body"]
     )
@@ -519,7 +519,7 @@ async def test_json_preflight_preserves_utf8_quotes_and_control_characters():
         await store.close()
     assert outcome.status == "stored"
     document = next(
-        item for item in client.objects if item["Key"].endswith("/document.md")
+        item for item in client.objects if item["Key"].endswith("/input.md")
     )
     assert document["Body"].decode("utf-8") == content
 

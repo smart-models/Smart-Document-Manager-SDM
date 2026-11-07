@@ -73,7 +73,7 @@ async def test_parse_archives_hidden_png_and_rewrites_only_archival_markdown():
     assert page["markdown"] == "# Figure\n![image](../../outside.png)"
     files = {entry["Key"].split("/", 1)[-1]: entry["Body"] for entry in client.objects}
     assert files["images/p0001-0001.png"] == base64.b64decode(PNG)
-    assert files["document.md"] == b"# Figure\n![image](images/p0001-0001.png)"
+    assert files["input.md"] == b"# Figure\n![image](images/p0001-0001.png)"
     archived_page = json.loads(files["json_ocr.json"])["pages"][0]
     assert "images" not in archived_page and "image_names" not in archived_page
     assert (
@@ -115,7 +115,7 @@ async def test_parse_archive_rewrites_images_after_normalization():
     assert page["markdown"] == '# Figure\n<img src="../../outside.png">'
     files = archive_files(client)
     assert files["images/p0001-0001.png"] == base64.b64decode(PNG)
-    assert files["document.md"] == b'# Figure\n<img src="images/p0001-0001.png">'
+    assert files["input.md"] == b'# Figure\n<img src="images/p0001-0001.png">'
     archived_page = json.loads(files["json_ocr.json"])["pages"][0]
     assert "images" not in archived_page and "image_names" not in archived_page
     assert (
@@ -154,7 +154,7 @@ async def test_parse_archive_converts_tables_when_table_format_markdown():
     page = response.json()["pages"][0]
     assert page["markdown"] == "| A | B |\n| --- | --- |\n| 1 | 2 |"
     files = archive_files(client)
-    assert files["document.md"] == b"| A | B |\n| --- | --- |\n| 1 | 2 |"
+    assert files["input.md"] == b"| A | B |\n| --- | --- |\n| 1 | 2 |"
 
 
 class HtmlPipeline(FakePipeline):
@@ -207,7 +207,7 @@ async def test_parse_archive_normalizes_markdown_when_output_json():
     assert page["markdown"] is None
     archived = json.loads(archive_files(client)["json_ocr.json"])["pages"][0]
     assert archived["blocks"][0]["content"] == "<b>block content</b>"
-    assert archive_files(client)["document.md"] == b"Hello **world**"
+    assert archive_files(client)["input.md"] == b"Hello **world**"
 
 
 async def test_parse_archive_keeps_tables_with_html_format():
@@ -232,7 +232,7 @@ async def test_parse_archive_keeps_tables_with_html_format():
         "Intro<table><tr><th>A</th><th>B</th></tr><tr><td>1</td><td>2</td></tr></table>"
     )
     files = archive_files(client)
-    assert files["document.md"] == (
+    assert files["input.md"] == (
         "Intro<table><tr><th>A</th><th>B</th></tr><tr><td>1</td><td>2</td></tr></table>"
     ).encode("utf-8")
 
@@ -321,7 +321,10 @@ async def test_original_hash_optional_input_and_public_storage_headers(path, mul
     assert health.json()["storage"]["timestamp"]
     if path == "/ocr":
         assert "json_ocr.json" not in files
-        assert files["document.md"] == response.json()["result"].encode("utf-8")
+        # The Markdown takes the sanitized upload name; a body without a
+        # filename falls back to the "input" stem.
+        markdown = "unsafe.md" if multipart else "input.md"
+        assert files[markdown] == response.json()["result"].encode("utf-8")
 
 
 @pytest.mark.parametrize("save_parsed", [False, True])
@@ -357,7 +360,7 @@ async def test_chunks_store_exact_http_bytes_and_full_options_despite_projection
     files = archive_files(client)
     assert files["json_chunks.json"] == response.content
     assert ("parsed.json" in files) is save_parsed
-    assert files["document.md"] == b"# Fixture"
+    assert files["input.md"] == b"# Fixture"
     assert set(response.json()["chunks"][0]) == {"id", "text", "token_count"}
     manifest = json.loads(files["manifest.json"])
     assert manifest["requested"]["options"]["metadata_fields"] == []
@@ -683,7 +686,7 @@ async def test_missing_figures_are_reported_and_image_link_titles_are_preserved(
     finally:
         await store.close()
     files = archive_files(client)
-    assert files["document.md"] == (
+    assert files["input.md"] == (
         b'![found](images/p0001-0001.png "Caption")\n![missing](missing.png)'
     )
     manifest = json.loads(files["manifest.json"])
@@ -741,3 +744,110 @@ async def test_partial_parse_archive_marks_partial_and_unprocessed_pages(
     rag = json.loads(files["json_rag.json"])
     assert rag["metadata"]["unprocessed_pages"] == [5, 6, 7, 8, 9]
     assert listing.json()["items"][0]["unprocessed_pages"] == [5, 6, 7, 8, 9]
+
+
+class NumberedPipeline(FakePipeline):
+    """Emit a distinct Markdown body per page so page files can be told apart."""
+
+    async def parse_document(self, *args, **kwargs):
+        pages = await super().parse_document(*args, **kwargs)
+        for number, page in enumerate(pages, 1):
+            page["markdown"] = f"# Page {number}"
+        return pages
+
+
+async def test_parse_archive_names_markdown_after_source_and_splits_pages():
+    """A parse archive keeps the whole Markdown as <stem>.md plus one file per page.
+
+    The stem is the sanitized upload name without its extension, the same one
+    that names the archive folder. Page files live under ``document/`` with a
+    zero-padded page number so object listings sort in reading order.
+    """
+    from test_parse_blocks import a4_pdf
+
+    settings, client = configured(), MemoryS3()
+    store = ArtifactStore(settings, client=client)
+    app = create_app(
+        settings, NumberedPipeline(), FakeRecognizer(), artifact_store=store
+    )
+    try:
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app), base_url="http://test"
+        ) as http:
+            response = await http.post(
+                "/parse",
+                files={"file": ("Relazione 2026.pdf", a4_pdf(2), "application/pdf")},
+            )
+    finally:
+        await store.close()
+    assert response.status_code == 200, response.text
+    assert response.headers["x-ocr-storage-status"] == "stored"
+    files = archive_files(client)
+    assert files["document/Relazione_2026_p0001.md"] == b"# Page 1"
+    assert files["document/Relazione_2026_p0002.md"] == b"# Page 2"
+    assert files["Relazione_2026.md"] == b"# Page 1\n\n# Page 2"
+    assert "document.md" not in files
+    manifest = json.loads(files["manifest.json"])
+    assert manifest["archive_schema_version"] == 3
+    names = [entry["name"] for entry in manifest["artifacts"]]
+    assert names.index("document/Relazione_2026_p0002.md") < names.index(
+        "Relazione_2026.md"
+    )
+
+
+class FigurePipeline(FakePipeline):
+    """Give every page one figure crop and fail page 7, numbering the rest."""
+
+    async def parse_document(self, *args, **kwargs):
+        pages = await super().parse_document(*args, **kwargs)
+        for number, page in enumerate(pages, 1):
+            page["markdown"] = f"# Page {number}\n![fig](fig.png)"
+            page["images"] = [{"name": "fig.png", "png": base64.b64decode(PNG)}]
+        pages[6] = {"error": "fixture page failed"}
+        return pages
+
+
+async def test_page_markdown_links_crops_from_its_folder_and_skips_failed_pages():
+    """Page files resolve crops from ``document/``; failed pages have no file.
+
+    The root ``<stem>.md`` keeps ``images/...`` while each page file under
+    ``document/`` climbs one level with ``../images/...`` so a Markdown reader
+    opening either file finds the PNG. With twelve pages the inventory and the
+    lexical order of the page names both follow the reading order.
+    """
+    from test_parse_blocks import a4_pdf
+
+    settings, client = configured(), MemoryS3()
+    store = ArtifactStore(settings, client=client)
+    app = create_app(settings, FigurePipeline(), FakeRecognizer(), artifact_store=store)
+    try:
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app), base_url="http://test"
+        ) as http:
+            response = await http.post(
+                "/parse", files={"file": ("report.pdf", a4_pdf(12), "application/pdf")}
+            )
+    finally:
+        await store.close()
+    assert response.status_code == 200, response.text
+    assert response.headers["x-ocr-storage-status"] == "stored"
+    files = archive_files(client)
+    assert files["document/report_p0001.md"] == (
+        b"# Page 1\n![fig](../images/p0001-0001.png)"
+    )
+    assert files["document/report_p0012.md"] == (
+        b"# Page 12\n![fig](../images/p0012-0001.png)"
+    )
+    assert "document/report_p0007.md" not in files
+    assert "images/p0007-0001.png" not in files
+    assert files["report.md"].startswith(b"# Page 1\n![fig](images/p0001-0001.png)")
+    assert b"../images/" not in files["report.md"]
+    expected = [f"document/report_p{n:04d}.md" for n in range(1, 13) if n != 7]
+    manifest = json.loads(files["manifest.json"])
+    page_names = [
+        entry["name"]
+        for entry in manifest["artifacts"]
+        if entry["name"].startswith("document/")
+    ]
+    assert page_names == expected == sorted(expected)
+    assert manifest["pages"] == 12 and manifest["partial_ocr"] is True

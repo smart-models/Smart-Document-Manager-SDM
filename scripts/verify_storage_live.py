@@ -355,9 +355,34 @@ class Verification:
             not any(name.startswith("input.") for name in blobs),
             "Original unexpectedly stored",
         )
-        require(bool(blobs.get("document.md")), "Markdown missing")
+        # The whole-document Markdown is the only ``.md`` at the archive root.
+        # Under ``document/`` every parsed page, and no failed one, has its own
+        # file named after it, in page order; joined back with their crop links
+        # pointed at the root they must give the whole document again.
+        markdown = next((n for n in blobs if n.endswith(".md") and "/" not in n), "")
+        require(bool(blobs.get(markdown)), "Markdown missing")
         payload = response.json()
         kind = manifest["kind"]
+        parsed_pages = json.loads(
+            blobs.get("json_ocr.json") or blobs.get("parsed.json") or "{}"
+        ).get("pages", [])
+        page_files = [
+            f"document/{markdown[:-3]}_p{number:04d}.md"
+            for number, page in enumerate(parsed_pages, 1)
+            if not page.get("error")
+        ]
+        require(
+            [name for name in blobs if name.startswith("document/")] == page_files,
+            "Per-page Markdown files differ from the parsed pages",
+        )
+        require(
+            not page_files
+            or b"\n\n".join(
+                blobs[name].replace(b"../images/", b"images/") for name in page_files
+            )
+            == blobs[markdown],
+            "Per-page Markdown does not add up to the whole document",
+        )
         expected = json.loads(response.content)
         if kind == "parse":
             expected.pop("json_rag", None)
@@ -388,8 +413,13 @@ class Verification:
             with Image.open(io.BytesIO(png)) as image:
                 image.verify()
             require(
-                mapping["path"].encode() in blobs["document.md"],
+                mapping["path"].encode() in blobs[markdown],
                 "Figure reference unresolved",
+            )
+            require(
+                f"../{mapping['path']}".encode()
+                in blobs[f"document/{markdown[:-3]}_p{mapping['page']:04d}.md"],
+                "Figure reference unresolved in the page file",
             )
         if require_images:
             require(bool(manifest["images"]), "Fixture produced no figure crops")
@@ -403,6 +433,7 @@ class Verification:
             "manifest_key": key,
             "prefix": key.removesuffix("manifest.json"),
             "created_at": manifest["created_at"],
+            "markdown": markdown,
             "objects": len(blobs) + 1,
             "bytes": sum(map(len, blobs.values())),
             "figures": len(manifest["images"]),
@@ -417,7 +448,9 @@ class Verification:
         detail = await http.get("/storage/archive", params={"prefix": record["prefix"]})
         require(detail.status_code == 200, "Storage browser cannot open new archive")
         files = detail.json()["files"]
-        document = next((item for item in files if item["name"] == "document.md"), None)
+        document = next(
+            (item for item in files if item["name"] == record["markdown"]), None
+        )
         require(document is not None, "Storage browser archive omits Markdown")
         preview = await http.get(
             "/storage/file", params={"key": document["key"], "preview": "true"}
@@ -507,7 +540,9 @@ class Verification:
                 require(
                     "quick brown fox"
                     in self.get(
-                        record["manifest_key"].replace("manifest.json", "document.md")
+                        record["manifest_key"].replace(
+                            "manifest.json", record["markdown"]
+                        )
                     )
                     .decode()
                     .lower(),

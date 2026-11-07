@@ -8,8 +8,9 @@ import json
 import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from pathlib import PurePosixPath
 
-from ocrserver.archive_names import parse_prefix
+from ocrserver.archive_names import parse_prefix, safe_filename
 from ocrserver.chunking.types import VERSION as CHUNKER_VERSION
 from ocrserver.config import Settings
 from ocrserver.pdf_utils import is_pdf
@@ -348,6 +349,16 @@ def _build_archive(capture, result, prefix, parsed, result_bytes):
         add(name, result_payload, "application/json")
     if parsed is not None and settings.storage_save_parsed:
         add("parsed.json", _parsed_payload(parsed), "application/json")
+    # Markdown objects are named after the sanitized upload, the same name that
+    # heads the archive folder: ``<stem>.md`` joins every page, and
+    # ``document/<stem>_pNNNN.md`` holds one page each so a reader can fetch a
+    # page without loading a document larger than it can hold.
+    stem = PurePosixPath(
+        safe_filename(
+            capture.original_filename, capture.source_info.get("extension", "bin")
+        )
+    ).stem
+    markdown_type = "text/markdown; charset=utf-8"
     markdown_pages = [source_result.result] if capture.kind == "ocr" else []
     for page in capture.pages:
         markdown = page.markdown
@@ -374,12 +385,24 @@ def _build_archive(capture, result, prefix, parsed, result_bytes):
         )
         if markdown:
             markdown_pages.append(markdown)
+            # The page file sits one folder below the crops, so its links climb
+            # to ``../images/``. The pass above already recorded any missing
+            # reference, so this one hands warnings to a throwaway list.
+            page_markdown = _rewrite_images(
+                page.markdown,
+                {original: f"../{path}" for original, path in paths.items()},
+                page.number,
+                [],
+                settings,
+                settings.storage_max_bytes - used,
+            )
+            add(
+                f"document/{stem}_p{page.number:04d}.md",
+                page_markdown.encode("utf-8"),
+                markdown_type,
+            )
     if markdown_pages:
-        add(
-            "document.md",
-            "\n\n".join(markdown_pages).encode("utf-8"),
-            "text/markdown; charset=utf-8",
-        )
+        add(f"{stem}.md", "\n\n".join(markdown_pages).encode("utf-8"), markdown_type)
     rag = getattr(source_result, "json_rag", None)
     if rag is not None:
         add("json_rag.json", rag, "application/json")
@@ -431,7 +454,9 @@ def _build_archive(capture, result, prefix, parsed, result_bytes):
         [],
     )
     manifest = {
-        "archive_schema_version": 2,  # 2 adds "pages"
+        # 2 adds "pages"; 3 names the Markdown after the source and adds one
+        # Markdown object per page under "document/".
+        "archive_schema_version": 3,
         "complete": True,
         "kind": capture.kind,
         "endpoint": {

@@ -40,7 +40,7 @@ are MCP calls (`name` plus `arguments`) with concrete values.
    document longer than about 20 pages; it always starts at page 1. Over about
    20 pages the response itself outgrows what a client can show: with storage
    on keep `include_images=false` and prefer `output="json"` — the archive keeps
-   `document.md` and the crops regardless — then read the archive with the
+   the Markdown, whole and per page, and the crops regardless — then read the archive with the
    stored-document playbook instead of the response.
 4. Call `ocr_parse_document` once with the approved parameters.
 5. Read `warnings` and every page `error`: `pages_truncated`, `pages_unprocessed`
@@ -168,7 +168,8 @@ The detail from `ocr_get_storage_archive` already carries the manifest and the
 | What it says, a summary, a value, a table, a quote | `json_ocr.json` (`parsed.json` in a `parse-chunks` archive), read with `smart-document-reader` | `ocr_download_storage_file`, `preview=true`; `preview=false` only over 1 MiB |
 | Chunks for RAG, or a refinement | `json_rag.json`, `sha256` from `files[]` | `preview=true` to read; `preview=false` before a refinement (its playbook) |
 | What a figure, chart or stamp shows | its caption and block `bbox` in `json_ocr.json`; `manifest.images[]` maps each image reference, named by block type and bbox, to `images/pNNNN-NNNN.png` | download the crop: it comes back as an image to look at |
-| An `ocr` archive (`manifest.kind`) | `document.md` (see `smart-document-reader`) | `preview=true` |
+| One page's text, when the page is known | `document/<stem>_pNNNN.md`, one page each (`manifest.pages` counts them; a page in error has none) | `preview=true` |
+| An `ocr` archive (`manifest.kind`) | `<stem>.md` (see `smart-document-reader`) | `preview=true` |
 
 `files[].size` decides how much text one reading can hold:
 
@@ -177,16 +178,22 @@ The detail from `ocr_get_storage_archive` already carries the manifest and the
    chunks keep `page`, type and, when the page has them, header, footer,
    footnotes and page labels, so pages can still be cited; block ids, boxes and
    caption links are gone — say so.
-3. Larger still: `document.md` up to about 350 KB. It joins the page markdowns
+3. Larger still: `<stem>.md` up to about 350 KB, `<stem>` being the archive
+   folder's filename without its extension. It joins the page markdowns
    with no page boundaries, headers, footers, footnotes or page labels: cite a
    page only when the text itself names one, and say so.
-4. Beyond that one reading cannot hold the text: say so and offer a new parse
+4. Beyond that, or whenever the question names a page: `document/<stem>_pNNNN.md`
+   holds one page each (`NNNN` the 1-based page number, zero-padded), the same
+   text with crops linked as `../images/...`, so a page is cited by its file
+   name; read the pages the question needs, never all of them. Archives before schema 3 (`archive_schema_version`)
+   have only an unsplit `document.md`.
+5. Otherwise one reading cannot hold the text: say so and offer a new parse
    with `json_rag=true` and `max_pages` on the leading pages that matter, or
    the console.
 
 Observed on real text documents parsed with `output="both"`: 6–25 KB of
 `json_ocr.json` per page; `json_rag.json` about half to two thirds of it;
-`document.md` a fifth to a third. With `output="json"` the `json_ocr.json` is
+`<stem>.md` a fifth to a third. With `output="json"` the `json_ocr.json` is
 about a third smaller and both ratios rise. Sparse pages fall far below all three. A client may cap a tool result well below
 these sizes and hand you the text as a saved file: filter that file with a local
 tool for the page or blocks the question needs instead of reading it whole.

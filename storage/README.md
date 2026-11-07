@@ -85,7 +85,7 @@ Defined in `.env.example` Sections 12 and 13:
 | `OCR_S3_BUCKET` | `ocr-outputs` | Dedicated S3 bucket for OCR archives |
 | `OCR_S3_RETENTION_DAYS` | `30` | Bucket expiration rule in days (`0` deletes the lifecycle rule) |
 | `OCR_STORAGE_SAVE_INPUT` | `false` | Opt in to archiving original uploaded input files alongside parsed outputs; an input that would exceed `OCR_STORAGE_MAX_BYTES`/`OCR_STORAGE_MAX_OBJECTS` is left out (manifest `archive_warnings` code `input_not_saved`) instead of failing the archive |
-| `OCR_STORAGE_SAVE_PARSED` | `true` | Save the pre-chunking `/parse` result as `parsed.json` in `parse-chunks` archives; `parse` archives always keep `json_ocr.json` and `document.md` |
+| `OCR_STORAGE_SAVE_PARSED` | `true` | Save the pre-chunking `/parse` result as `parsed.json` in `parse-chunks` archives; `parse` archives always keep `json_ocr.json`, the whole Markdown as `<stem>.md` and one page each as `document/<stem>_pNNNN.md` (crops linked as `../images/...`), where `<stem>` is the archive folder's filename without its extension; every parsed page costs one object and a second copy of its Markdown bytes against `OCR_STORAGE_MAX_OBJECTS`/`OCR_STORAGE_MAX_BYTES` |
 | `OCR_S3_ADMIN_ACCESS_KEY`, `OCR_S3_ADMIN_SECRET_KEY` | empty | Provisioning admin credentials (`storage-init` and `seaweedfs` only) |
 | `OCR_S3_ACCESS_KEY`, `OCR_S3_SECRET_KEY` | empty | `ocr-writer` credentials for `ocr-api` |
 | `OCR_S3_BROWSER_ACCESS_KEY`, `OCR_S3_BROWSER_SECRET_KEY` | empty | `ocr-browser` credentials for `ocr-api` |

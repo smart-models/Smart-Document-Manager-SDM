@@ -69,7 +69,7 @@ def test_skill_frontmatter_length_links_and_rules():
     frontmatter = yaml.safe_load(match.group(1))
     assert frontmatter["name"] == "smart-document-reader"
     assert_what_and_when(frontmatter["description"])
-    assert 120 <= len(text.splitlines()) <= 230
+    assert 120 <= len(text.splitlines()) <= 240
     assert "references/" in text
     for reference in ("block-types.md", "document-types.md"):
         assert reference in text
@@ -155,7 +155,8 @@ def test_archive_files_and_manifest_fields_are_covered():
         "`images[].key`",
         "lack `pages` and may lack `unprocessed_pages`",
         "(parsed count), `partial_ocr`",
-        "`document.md`",
+        "`<stem>.md`",
+        "`document/<stem>_pNNNN.md`",
         "`json_rag_<job>_<n>.json`",
         "`input.<ext>`",
         "`requested.filename`",

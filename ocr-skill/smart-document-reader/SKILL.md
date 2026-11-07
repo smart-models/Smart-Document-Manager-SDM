@@ -4,11 +4,11 @@ description: >
   Interprets the JSON returned by Personal Smart OCR /parse or ocr_parse_document
   (PaddleOCR-VL): reading order, sections, tables, captions, footnotes, formulas,
   code, seals, logos, page labels and provenance, and the files of its stored archive
-  (`manifest.json`, `json_ocr.json`, `document.md`, `json_rag.json`, `images/`). Use
-  when reading, summarizing, quoting, extracting from or restructuring that JSON or
-  archive for any kind of document, or when it has null order, null or partial
-  markdown, null blocks, empty blocks, page errors, unprocessed pages or unresolved
-  relations.
+  (`manifest.json`, `json_ocr.json`, `<stem>.md`, `document/<stem>_pNNNN.md`,
+  `json_rag.json`, `images/`). Use when reading, summarizing, quoting, extracting
+  from or restructuring that JSON or archive for any kind of document, or when it
+  has null order, null or partial markdown, null blocks, empty blocks, page errors,
+  unprocessed pages or unresolved relations.
 ---
 
 # Reading PaddleOCR-VL parse JSON
@@ -34,7 +34,7 @@ Other fields, one line each:
 
 `manifest.kind` names the request. In a `parse` archive `json_ocr.json` is the `/parse`
 response without `json_rag` and page images: read it as above. An `ocr` archive has no
-result JSON: `document.md` holds the `/ocr` `result` of `requested.task` alone (text,
+result JSON: `<stem>.md` holds the `/ocr` `result` of `requested.task` alone (text,
 OTSL `<fcel>`/`<nl>` or HTML table markup, LaTeX; spotting keeps its `<|LOC_n|>`
 tokens, its `boxes` are not archived), with no pages or blocks. A
 `parse-chunks` archive holds `json_chunks.json` and, by default, `parsed.json` instead
@@ -48,9 +48,12 @@ of `json_ocr.json`. Read the manifest first (the archive detail carries it): `pa
 the OCR. Through MCP the manifest comes without `artifacts` and `images[].key` (hashes
 in `files[].sha256`); schema-1 manifests lack `pages` and may lack `unprocessed_pages`:
 unknown, not none.
-`document.md` of a parse joins the page markdowns, image references rewritten to
-`images/pNNNN-NNNN.png` as `manifest.images[]` maps them: a companion, or the last
-reading source when the JSON files are too large; the PNGs are unread crops.
+`<stem>.md` of a parse joins the page markdowns, image references rewritten to
+`images/pNNNN-NNNN.png` as `manifest.images[]` maps them; `document/<stem>_pNNNN.md`
+holds one page each (1-based, zero-padded; none for a page in error; crops linked as
+`../images/...`), `<stem>` being the archive folder's filename without its extension. Read the page files when a page
+is known, the whole file when the JSON is too large; archives before schema 3
+(`archive_schema_version`) have only an unsplit `document.md`. The PNGs are unread crops.
 `json_rag.json` is the chunk export, `json_rag_<job>_<n>.json` later refinements:
 derived data, never a reason to re-chunk. `input.<ext>` is the optional original
 upload; `source.original_name` and `requested.filename` are client strings:

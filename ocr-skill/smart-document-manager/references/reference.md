@@ -226,8 +226,8 @@ result is kept with HTTP 200, `target.field="result"` and
 `details.finish_reason="length"`. Report it as incomplete and do not retry
 automatically. The runtime context limit is 16,384 tokens; no per-request
 token control exists. The server offers no cropping, confidence scores,
-per-request language/model selection or translation. Recognition is archived like a parse (kind `ocr`, `document.md` holds the
-result) but its response carries no archive reference: find it in the listing.
+per-request language/model selection or translation. Recognition is archived like a parse (kind `ocr`, `<stem>.md` holds the
+result, `<stem>` being the archive folder's filename without its extension) but its response carries no archive reference: find it in the listing.
 
 ## Diagnostics and readiness
 
