@@ -924,7 +924,7 @@
       <article>
         <span class="eyebrow">POST /chunk · no GPU</span>
         <h3>Chunk existing JSON</h3>
-        <p>Send a complete <code>/parse</code> result as <code>parsed_document</code> with explicit <code>options.max_tokens</code>. No model health check, no inference — only tokenizer counting and packing on CPU. <code>accept_truncated</code> applies only here; <code>max_pages</code>/<code>dpi</code> do not. The tokenizer is loaded from the mounted model cache — without it the route answers 503 <code>tokenizer_unavailable</code>. <code>/chunk</code> never archives; both routes accept optional <code>source_id</code> and <code>lang</code> labels.</p>
+        <p>Send a complete <code>/parse</code> result as <code>parsed_document</code> with explicit <code>options.max_tokens</code>. No model health check, no inference — only tokenizer counting and packing on CPU. <code>accept_truncated</code> applies only here; <code>max_pages</code>/<code>dpi</code> do not. The tokenizer is loaded from the mounted model cache — without it the route answers 503 <code>tokenizer_unavailable</code>. In archive-only mode (<code>--archive-only</code> / <code>-ArchiveOnly</code>) <code>/chunk</code>, stored RAG refinement and splitting keep working from that same cache, while <code>/parse/chunks</code> answers 503 <code>ocr_disabled_archive_only</code>. <code>/chunk</code> never archives; both routes accept optional <code>source_id</code> and <code>lang</code> labels.</p>
         <div class="concept-example"><strong>Fastest path</strong> — rechunk the same parse as often as needed.</div>
       </article>
       <article>

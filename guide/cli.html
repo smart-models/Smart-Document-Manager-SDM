@@ -858,6 +858,12 @@ bash stack.sh version</code></pre>
         <p><code>-NoMcp</code> / <code>--no-mcp</code> omits the MCP server for that run on up, config, verify, build, pull, restart and urls; on up it also stops and removes a running MCP container. <code>-Mcp</code> / <code>--mcp</code> forces it on. <code>-NoFrontend</code> / <code>--no-frontend</code> and <code>-Frontend</code> / <code>--frontend</code> override <code>EXPOSE_FRONTEND</code> on up and config. <code>-GpuDevice 1</code> / <code>--gpu-device 1</code> runs vLLM and the API on GPU 1 for that up or config, overriding <code>OCR_GPU_DEVICE</code>.</p>
       </article>
       <article class="card">
+        <span class="eyebrow">Archive-only / zero VRAM</span>
+        <h3>Read archives without the GPU.</h3>
+        <p><code>-ArchiveOnly</code> / <code>--archive-only</code> (or <code>OCR_ARCHIVE_ONLY=true</code> in <code>.env</code>) starts the stack without <code>vllm-paddleocr</code> and without reserving a GPU: a leftover model container is stopped, the API skips calibration, <code>/parse</code>, <code>/ocr</code> and <code>/parse/chunks</code> answer <code>503 ocr_disabled_archive_only</code>, and <code>/health</code> reports <code>mode=archive_only</code> with <code>vllm=disabled</code>. The console, <code>/storage/*</code> and the MCP storage tools read everything archived earlier. It needs storage and its browser enabled; a plain <code>up</code> later restores the full GPU stack, unless <code>.env</code> fixes <code>OCR_ARCHIVE_ONLY=true</code>, which you edit or override from the shell (<code>OCR_ARCHIVE_ONLY=false</code>) first.</p>
+        <a class="card-link" href="#archive-only">Archive-only commands ↓</a>
+      </article>
+      <article class="card">
         <span class="eyebrow">Naming, not isolation</span>
         <h3>Project names do not isolate.</h3>
         <p><code>-EnvFile</code> / <code>--env-file</code> selects another existing env file. <code>-ProjectName</code> / <code>--project-name</code> changes Compose bookkeeping only — container, network and volume names are fixed, so one stack per Docker daemon.</p>
@@ -883,6 +889,26 @@ bash stack.sh up --wait</code></pre>
             <button type="button" class="copy-button" data-copy="storage-setup-linux" data-status="storage-setup-status" hidden>Copy Linux command</button>
           </div>
           <p class="copy-status" id="storage-setup-status" role="status" style="grid-column: 1 / -1;"></p>
+        </div>
+      </div>
+    </details>
+    <details id="archive-only">
+      <summary>Consult archives without a GPU (archive-only)</summary>
+      <div class="detail-body">
+        <p>The overlay <code>compose.archive-only.yml</code> is merged after <code>compose.yml</code>: <code>vllm-paddleocr</code> leaves the resolved model, <code>ocr-api</code> loses its vLLM dependency and GPU reservation and receives <code>OCR_ARCHIVE_ONLY=true</code>. <code>build</code> and <code>pull</code> skip the model server too, <code>restart</code> leaves it alone and never changes mode (switch with <code>up</code>), <code>config</code> renders the merged shape, <code>urls</code> names the mode and <code>verify</code> always checks both shapes. It requires <code>OCR_STORAGE_ENABLED</code>, <code>OCR_STORAGE_BROWSER_ENABLED</code> and archives from earlier OCR runs; <code>-GpuDevice</code> / <code>--gpu-device</code> is refused together with it and <code>OCR_GPU_DEVICE</code> in <code>.env</code> is ignored for that run. Switching either way deletes no archive, volume or model cache.</p>
+        <div class="command-pair">
+          <p class="code-caption">Run from the repository root</p>
+          <div data-shell="windows">
+            <span class="shell-label">Windows · PowerShell 7</span>
+            <pre><code id="archive-only-windows">pwsh .\stack.ps1 up -ArchiveOnly -Wait</code></pre>
+            <button type="button" class="copy-button" data-copy="archive-only-windows" data-status="archive-only-status" hidden>Copy Windows command</button>
+          </div>
+          <div data-shell="linux">
+            <span class="shell-label">Linux / macOS · Bash</span>
+            <pre><code id="archive-only-linux">bash stack.sh up --archive-only --wait</code></pre>
+            <button type="button" class="copy-button" data-copy="archive-only-linux" data-status="archive-only-status" hidden>Copy Linux command</button>
+          </div>
+          <p class="copy-status" id="archive-only-status" role="status" style="grid-column: 1 / -1;"></p>
         </div>
       </div>
     </details>

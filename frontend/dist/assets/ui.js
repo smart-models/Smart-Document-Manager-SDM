@@ -11,6 +11,7 @@
 export function initTabs(tablist) {
   const tabs = [...tablist.querySelectorAll('[role="tab"]')];
   const panelOf = (tab) => document.getElementById(tab.getAttribute('aria-controls'));
+  const visibleTabs = () => tabs.filter((t) => !t.hidden);
   const syncTabindex = () => {
     for (const t of tabs) {
       t.tabIndex = t.getAttribute('aria-selected') === 'true' ? 0 : -1;
@@ -28,6 +29,9 @@ export function initTabs(tablist) {
     syncTabindex();
   });
   tablist.addEventListener('keydown', (event) => {
+    // A page may hide tabs at runtime (the console hides Parse and OCR in
+    // archive-only mode): arrows and Home/End move among the visible ones.
+    const tabs = visibleTabs();
     const index = tabs.indexOf(document.activeElement);
     if (index === -1) return;
     let target;

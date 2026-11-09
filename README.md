@@ -110,6 +110,12 @@ endpoint on `http://127.0.0.1:8021/mcp`.
 `down` stops it again, `logs` follows it, `status` shows what is running —
 [`cli.html`](guide/cli.html) covers the rest.
 
+Already have archives and no GPU at hand? `pwsh stack.ps1 up -ArchiveOnly` /
+`bash stack.sh up --archive-only` starts the stack without the model server:
+nothing is recognized and no VRAM is allocated, but the console, the REST
+`/storage/*` routes and the MCP storage tools read everything saved earlier
+([archive-only mode](scripts/README.md#archive-only-mode)).
+
 ## 🖥️ How do I interact with it?
 
 Open that address, register the API key once, and every option is on the

@@ -48,6 +48,7 @@ from ocrserver.element_ocr import (
 from ocrserver.json_rag import build_json_rag, document_name
 from ocrserver.metrics import (
     ACTIVE_REQUESTS,
+    ARCHIVE_ONLY_MODE,
     AUTOTUNE_INFO,
     PAGE_DURATION,
     PAGES_PROCESSED,
@@ -104,6 +105,14 @@ PUBLIC_AUTH_PATHS = {
     "/docs/oauth2-redirect",
     "/redoc",
     "/openapi.json",
+}
+# POST routes that run layout or VL inference. Archive-only refuses them in
+# the middleware, before the body is read: no rasterization, no Office
+# conversion, no admission slot, no Paddle/VL initialization, no vLLM call.
+INFERENCE_PATHS = frozenset({"/parse", "/ocr", "/parse/chunks"})
+ARCHIVE_ONLY_DETAIL = {
+    "code": "ocr_disabled_archive_only",
+    "message": "OCR inference is disabled in archive-only mode.",
 }
 
 
@@ -767,6 +776,7 @@ def create_app(
         )
 
     autotune_state = _autotune_state(profile, settings)
+    ARCHIVE_ONLY_MODE.set(1 if settings.archive_only else 0)
     if profile and profile.get("decisions"):
         AUTOTUNE_INFO.info(
             {
@@ -788,7 +798,13 @@ def create_app(
             logger.warning(
                 "OCR API authentication is disabled: OCR_SERVER_API_TOKENS is empty"
             )
-        poll_task = asyncio.create_task(_poll_vllm(settings, vllm_client))
+        if settings.archive_only:
+            # No model server exists to poll: the gauge stays 0 by design and
+            # /health reports vllm="disabled" instead of an outage.
+            VLLM_UP.set(0)
+            poll_task = None
+        else:
+            poll_task = asyncio.create_task(_poll_vllm(settings, vllm_client))
         probe_task = asyncio.create_task(_probe_storage(artifact_store))
         try:
             yield
@@ -798,6 +814,8 @@ def create_app(
             await storage_browser.close()
             await chunk_runtime.close()
             for task in (poll_task, probe_task):
+                if task is None:
+                    continue
                 task.cancel()
                 try:
                     await task
@@ -962,6 +980,15 @@ def create_app(
                     if not rate_exempt:
                         _check_rate_limit(request)
                     _check_auth(request)
+                    if (
+                        settings.archive_only
+                        and request.method == "POST"
+                        and path in INFERENCE_PATHS
+                    ):
+                        REQUESTS_REJECTED.labels(reason="archive_only").inc()
+                        # Wrapped like a route error: /parse and /ocr clients
+                        # read detail.code, so the refusal keeps their shape.
+                        raise HTTPException(503, detail={"detail": ARCHIVE_ONLY_DETAIL})
             except HTTPException as exc:
                 response = JSONResponse(status_code=exc.status_code, content=exc.detail)
             else:
@@ -1021,16 +1048,30 @@ def create_app(
 
     @app.get("/health", status_code=200, tags=["MONITORING"])
     async def health():
-        vllm_reachable = VLLM_UP._value.get() == 1.0
-        status_val = "healthy" if vllm_reachable else "degraded"
+        """Readiness for the mode the server runs in.
+
+        OCR mode is healthy while vLLM answers its health poll. Archive-only
+        mode has no vLLM by design (``vllm="disabled"`` is not degraded) and
+        is healthy only once the archive bucket probe has succeeded: the S3
+        bucket is the one upstream it depends on, so ``unknown`` (no probe
+        yet) and ``error`` both report degraded.
+        """
+        storage = artifact_store.diagnostic()
+        if settings.archive_only:
+            vllm, healthy = "disabled", storage.get("status") == "ok"
+        else:
+            reachable = VLLM_UP._value.get() == 1.0
+            vllm, healthy = ("reachable" if reachable else "unreachable"), reachable
         return {
-            "status": status_val,
-            "vllm": "reachable" if vllm_reachable else "unreachable",
+            "status": "healthy" if healthy else "degraded",
+            "mode": "archive_only" if settings.archive_only else "ocr",
+            "vllm": vllm,
+            "ocr_enabled": not settings.archive_only,
             "model": MODEL_NAME,
             "pipeline_version": PIPELINE_VERSION,
             "version": APP_VERSION,
             "autotune": autotune_state,
-            "storage": artifact_store.diagnostic(),
+            "storage": storage,
         }
 
     @app.get("/stats", tags=["MONITORING"])

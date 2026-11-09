@@ -173,6 +173,12 @@ CODE_GUIDANCE = {
     "queue_full": "Call ocr_get_stats and wait for capacity before retrying.",
     "slots_full": "Call ocr_get_stats and reduce recognition concurrency.",
     "backend_unavailable": "Call ocr_check_health and wait for a healthy backend.",
+    "ocr_disabled_archive_only": (
+        "The OCR API runs in archive-only mode: parsing and recognition are "
+        "off by design and waiting changes nothing. Use the storage tools; OCR "
+        "comes back only when an operator starts the stack in OCR mode (no "
+        "--archive-only / -ArchiveOnly flag, OCR_ARCHIVE_ONLY unset or false)."
+    ),
     "shutting_down": "Wait for the OCR API to restart, then call ocr_check_health.",
     "request_timeout": (
         "Work may still be running. Check ocr_get_stats; reduce pages "

@@ -333,6 +333,8 @@ test("status tiles distinguish degraded and unknown from down", () => {
   assert.match(statusTile("health", "degraded"), /metric-value warn">DEGRADED</);
   assert.match(statusTile("vllm", "unknown"), /metric-value warn">UNKNOWN</);
   assert.match(statusTile("vllm", false, "unreachable"), /metric-value down">DOWN unreachable</);
+  // Archive-only mode: a component switched off on purpose is neutral, not down.
+  assert.match(statusTile("vllm", "disabled"), /metric-value muted">DISABLED</);
 });
 
 test("flat chart series sit mid-height with whole-number ticks", () => {

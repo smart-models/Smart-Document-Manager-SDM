@@ -11,6 +11,9 @@ from typing import Mapping
 HARDWARE_PROFILES: tuple[str, ...] = ()  # This application requires NVIDIA GPU.
 DEFAULT_WAIT_TIMEOUT = "3600"
 COMMANDS = {"up", "verify", "config", "build", "pull", "restart", "urls"}
+# Merged after compose.yml in archive-only mode: parks vllm-paddleocr under an
+# unused profile and strips the API's vLLM dependency and GPU reservation.
+ARCHIVE_ONLY_OVERLAY = "compose.archive-only.yml"
 
 
 class ConfigurationError(ValueError):
@@ -62,6 +65,12 @@ def boolean(value: str, default: bool, name: str) -> bool:
     raise ConfigurationError(f"{name} must be true or false.")
 
 
+def sibling(path: str, name: str) -> str:
+    """Return `name` beside `path`, keeping the caller's own separator style."""
+    cut = max(path.rfind("/"), path.rfind("\\")) + 1
+    return path[:cut] + name
+
+
 def switch(cli: Mapping[str, str], name: str, fallback: bool) -> bool:
     """Resolve an opposed --<name> / --no-<name> CLI flag pair."""
     positive = boolean(cli.get(f"flag-{name}", ""), False, name)
@@ -100,6 +109,22 @@ def build_plan(environment: Mapping[str, str], cli: Mapping[str, str]) -> Plan:
             environment.get("MCP_SERVER_ENABLED", ""), True, "MCP_SERVER_ENABLED"
         )
     )
+    # The CLI flag only switches archive-only on; OCR_ARCHIVE_ONLY in the env
+    # file makes it the configured default. Archives live in S3, so the mode
+    # is pointless without the writer and the browser role; refuse before any
+    # container changes instead of enabling storage behind the operator's back.
+    archive_only = boolean(
+        cli.get("flag-archive-only", ""), False, "archive-only"
+    ) or boolean(environment.get("OCR_ARCHIVE_ONLY", ""), False, "OCR_ARCHIVE_ONLY")
+    if archive_only and not all(
+        boolean(environment.get(key, ""), False, key)
+        for key in ("OCR_STORAGE_ENABLED", "OCR_STORAGE_BROWSER_ENABLED")
+    ):
+        raise ConfigurationError(
+            "Archive-only mode needs OCR_STORAGE_ENABLED=true and "
+            "OCR_STORAGE_BROWSER_ENABLED=true: it only serves stored archives. "
+            "Run python scripts/configure_storage.py first."
+        )
     wait_timeout = cli.get("wait-timeout", "") or DEFAULT_WAIT_TIMEOUT
     if (
         not wait_timeout.isascii()
@@ -112,18 +137,34 @@ def build_plan(environment: Mapping[str, str], cli: Mapping[str, str]) -> Plan:
     result = Plan(
         resolved={
             "hardware": "",
+            "archive_only": str(archive_only).lower(),
             "mcp_server_enabled": str(mcp).lower(),
             "storage_enabled": str(storage).lower(),
             "wait_timeout": wait_timeout,
         }
     )
+    if cli.get("flag-archive-only") == "true":
+        result.environment["OCR_ARCHIVE_ONLY"] = "true"
     if cli.get("flag-frontend") == "true" or cli.get("flag-no-frontend") == "true":
         if command not in {"up", "config"}:
             raise ConfigurationError("Frontend overrides support up and config only.")
         frontend = switch(cli, "frontend", True)
         result.environment["EXPOSE_FRONTEND"] = str(frontend).lower()
         result.resolved["expose_frontend"] = str(frontend).lower()
-    if command in {"up", "config"}:
+    if archive_only and cli.get("gpu-device"):
+        raise ConfigurationError(
+            "--gpu-device has no effect in archive-only mode: no service reserves "
+            "a GPU."
+        )
+    if command in {"up", "config"} and archive_only:
+        result.resolved["gpu_device"] = ""
+        if command == "up":
+            result.messages.append(
+                "Archive-only mode: vllm-paddleocr stays stopped, no GPU is "
+                "reserved and OCR inference is disabled; stored archives stay "
+                "readable."
+            )
+    elif command in {"up", "config"}:
         # One index from Docker/NVIDIA numbering; both GPU services reserve it.
         gpu = cli.get("gpu-device", "") or environment.get("OCR_GPU_DEVICE", "") or "0"
         if not re.fullmatch(r"0|[1-9][0-9]*", gpu):
@@ -145,24 +186,27 @@ def build_plan(environment: Mapping[str, str], cli: Mapping[str, str]) -> Plan:
             "Project names do not isolate the fixed container, volume and "
             "network names; concurrent stacks are unsupported."
         )
-    base += [
-        "--file",
-        cli.get("compose-file", "compose.yml"),
-        "--env-file",
-        cli.get("env-file", ".env"),
-    ]
+    compose_file = cli.get("compose-file", "compose.yml")
+    base += ["--file", compose_file]
+    if archive_only:
+        base += ["--file", sibling(compose_file, ARCHIVE_ONLY_OVERLAY)]
+    base += ["--env-file", cli.get("env-file", ".env")]
     if storage:
         base += ["--profile", "storage"]
     built = ["ocr-api"] + (["ocr-mcp"] if mcp else [])
     model_image = environment.get("OCR_VLLM_IMAGE", "").strip()
-    build_model = not model_image or model_image == "ocr-vllm:0.32.0-security"
-    if not build_model:
+    # Archive-only never builds, pulls or starts the model server.
+    build_model = not archive_only and (
+        not model_image or model_image == "ocr-vllm:0.32.0-security"
+    )
+    if not archive_only and not build_model:
         result.warnings.append(
             "Custom vLLM image selected; the default security image and its "
             "audit do not cover this override."
         )
     infrastructure = ["seaweedfs", "storage-gateway"] if storage else []
-    running = ["vllm-paddleocr", *infrastructure, *built]
+    model = [] if archive_only else ["vllm-paddleocr"]
+    running = [*model, *infrastructure, *built]
 
     def step(description: str, *arguments: str) -> None:
         result.steps.append(Step([*base, *arguments], description))
@@ -189,7 +233,18 @@ def build_plan(environment: Mapping[str, str], cli: Mapping[str, str]) -> Plan:
                 "--force",
                 "ocr-mcp",
             )
-        start("start vLLM and wait for model readiness", ["vllm-paddleocr"], True)
+        if archive_only:
+            # Entering archive-only must free the GPU: a model server left over
+            # from a normal run is stopped and removed; its cache volume stays.
+            step(
+                "stop and remove a running vLLM container; keep its model cache",
+                "rm",
+                "--stop",
+                "--force",
+                "vllm-paddleocr",
+            )
+        else:
+            start("start vLLM and wait for model readiness", ["vllm-paddleocr"], True)
         if storage:
             # Provisioning must finish before the first API write to the archive.
             # A failed run aborts execution; it is never hidden by detached up.
@@ -215,9 +270,17 @@ def build_plan(environment: Mapping[str, str], cli: Mapping[str, str]) -> Plan:
             start("start MCP after the OCR API is healthy", ["ocr-mcp"], wait)
         result.messages.append(
             f"Readiness has a finite {wait_timeout}s budget per stage; "
-            "a cold GPU/model calibration can take tens of minutes."
+            + (
+                "archive-only startup skips model loading and calibration."
+                if archive_only
+                else "a cold GPU/model calibration can take tens of minutes."
+            )
         )
     elif command == "pull":
+        if archive_only:
+            result.messages.append(
+                "Archive-only mode: the vLLM image is neither built nor pulled."
+            )
         if build_model:
             step(
                 "refresh the pinned vLLM base and build its security layer",
@@ -225,7 +288,7 @@ def build_plan(environment: Mapping[str, str], cli: Mapping[str, str]) -> Plan:
                 "--pull",
                 "vllm-paddleocr",
             )
-        registry = ([] if build_model else ["vllm-paddleocr"]) + infrastructure
+        registry = ([] if build_model else model) + infrastructure
         if registry:
             step("pull registry images; propagate download failures", "pull", *registry)
     elif command == "restart":
@@ -246,12 +309,16 @@ def build_plan(environment: Mapping[str, str], cli: Mapping[str, str]) -> Plan:
         )
 
     if command in {"up", "urls"}:
-        describe_endpoints(environment, result, mcp, storage)
+        describe_endpoints(environment, result, mcp, storage, archive_only)
     return result
 
 
 def describe_endpoints(
-    environment: Mapping[str, str], plan: Plan, mcp: bool, storage: bool
+    environment: Mapping[str, str],
+    plan: Plan,
+    mcp: bool,
+    storage: bool,
+    archive_only: bool = False,
 ) -> None:
     """Describe actual fixed loopback publications without disclosing credentials."""
 
@@ -266,6 +333,10 @@ def describe_endpoints(
     plan.summary.append(
         "Endpoints configured on host loopback (not a live health check):"
     )
+    if archive_only:
+        plan.summary.append(
+            "  Mode: archive-only -- OCR inference disabled; stored archives only."
+        )
     api_auth = (
         "bearer required for data endpoints"
         if environment.get("OCR_SERVER_API_TOKENS")
@@ -285,13 +356,16 @@ def describe_endpoints(
         plan.summary.append("  Frontend console: disabled.")
     if boolean(environment.get("EXPOSE_OCR_SWAGGER", ""), True, "EXPOSE_OCR_SWAGGER"):
         endpoint("OCR Swagger", "OCR_SERVER_PORT", 8020, "/docs", "public")
-    endpoint(
-        "vLLM API / Swagger",
-        "OCR_VLLM_DOCS_PORT",
-        8081,
-        "/docs",
-        "without authentication",
-    )
+    if archive_only:
+        plan.summary.append("  vLLM API / Swagger: not started (archive-only).")
+    else:
+        endpoint(
+            "vLLM API / Swagger",
+            "OCR_VLLM_DOCS_PORT",
+            8081,
+            "/docs",
+            "without authentication",
+        )
     if mcp:
         state = (
             "bearer required"

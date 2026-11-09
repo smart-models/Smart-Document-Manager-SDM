@@ -49,6 +49,11 @@ VLLM_UP = Gauge(
     "ocr_vllm_up",
     "1 if vLLM backend is reachable, 0 otherwise.",
 )
+ARCHIVE_ONLY_MODE = Gauge(
+    "ocr_archive_only_mode",
+    "1 in archive-only mode: vLLM is disabled by design, so ocr_vllm_up=0 is "
+    "not an outage.",
+)
 SERVER_INFO = Info(
     "ocr_server",
     "Server build and configuration info.",

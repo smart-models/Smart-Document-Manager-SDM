@@ -12,21 +12,53 @@ import sys
 from typing import Any, Mapping
 
 ROOT = Path(__file__).resolve().parents[1]
-BASE_SERVICES = {"ocr-api", "ocr-mcp", "vllm-paddleocr"}
+ARCHIVE_ONLY_OVERLAY = "compose.archive-only.yml"
+MODEL_SERVICE = "vllm-paddleocr"
+BASE_SERVICES = {"ocr-api", "ocr-mcp", MODEL_SERVICE}
 STORAGE_SERVICES = {"seaweedfs", "storage-gateway", "storage-init"}
 
 
-def validate_config(config: Mapping[str, Any]) -> list[str]:
-    """Enforce the repository boundary, with one explicit upstream vLLM exception."""
+def _device_reservations(service: Mapping[str, Any]) -> list:
+    """Return the GPU/device reservations a resolved service declares."""
+    deploy = service.get("deploy") or {}
+    if not isinstance(deploy, dict):
+        return [deploy]
+    reservations = (deploy.get("resources") or {}).get("reservations") or {}
+    return list(reservations.get("devices") or []) if reservations else []
+
+
+def validate_config(
+    config: Mapping[str, Any], *, archive_only: bool = False
+) -> list[str]:
+    """Enforce the repository boundary, with one explicit upstream vLLM exception.
+
+    The archive-only shape (compose.yml plus compose.archive-only.yml) must
+    hold the same hardening and, on top, prove its zero-VRAM promise: no model
+    server in the model, no API dependency on it and no device reservation on
+    any service.
+    """
     services = config.get("services")
-    if not isinstance(services, dict) or not BASE_SERVICES <= services.keys():
-        return ["Resolved Compose must contain OCR API, MCP and vLLM services."]
+    required = BASE_SERVICES - {MODEL_SERVICE} if archive_only else BASE_SERVICES
+    if not isinstance(services, dict) or not required <= services.keys():
+        return [
+            "Resolved Compose must contain OCR API and MCP services"
+            + (" (archive-only)." if archive_only else " and vLLM.")
+        ]
     errors = []
     if set(services) - BASE_SERVICES - STORAGE_SERVICES:
         errors.append(
             "Unexpected Compose services; update the security inventory "
             "before deployment."
         )
+    if archive_only:
+        if MODEL_SERVICE in services:
+            errors.append("Archive-only Compose must not define vllm-paddleocr.")
+        depends = services["ocr-api"].get("depends_on") or {}
+        if MODEL_SERVICE in depends:
+            errors.append("Archive-only ocr-api must not depend on vllm-paddleocr.")
+        for name, service in services.items():
+            if isinstance(service, dict) and _device_reservations(service):
+                errors.append(f"Archive-only service {name} must not reserve a GPU.")
     if (
         STORAGE_SERVICES.intersection(services)
         and not STORAGE_SERVICES <= services.keys()
@@ -100,17 +132,20 @@ def main() -> int:
     parser.add_argument("--project-name")
     args = parser.parse_args()
     errors = []
-    # Both supported profile combinations must preserve the boundary, even
-    # when the operator is currently starting only the base application.
-    for storage in (False, True):
-        command = [
-            "docker",
-            "compose",
-            "--file",
-            str(args.compose_file),
-            "--env-file",
-            str(args.env_file),
-        ]
+    # Every supported shape must preserve the boundary, even when the operator
+    # is currently starting only the base application: both profile states of
+    # the standard stack and both of the archive-only overlay.
+    shapes = [
+        (archive_only, storage)
+        for archive_only in (False, True)
+        for storage in (False, True)
+    ]
+    for archive_only, storage in shapes:
+        command = ["docker", "compose", "--file", str(args.compose_file)]
+        if archive_only:
+            overlay = args.compose_file.with_name(ARCHIVE_ONLY_OVERLAY)
+            command += ["--file", str(overlay)]
+        command += ["--env-file", str(args.env_file)]
         if args.project_name:
             command += ["--project-name", args.project_name]
         if storage:
@@ -131,7 +166,9 @@ def main() -> int:
                     "expanded output withheld."
                 )
                 continue
-            errors.extend(validate_config(json.loads(result.stdout)))
+            errors.extend(
+                validate_config(json.loads(result.stdout), archive_only=archive_only)
+            )
         except (OSError, subprocess.TimeoutExpired, ValueError):
             errors.append(
                 "Cannot inspect Compose security configuration; "
@@ -141,7 +178,7 @@ def main() -> int:
         print(f"[ERROR] {error}", file=sys.stderr)
     if not errors:
         print(
-            "Compose security: OK (base and storage profiles; "
+            "Compose security: OK (base, storage and archive-only shapes; "
             "named vLLM user/filesystem exception)."
         )
     return 1 if errors else 0

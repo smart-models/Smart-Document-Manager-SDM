@@ -1014,6 +1014,14 @@ bash stack.sh logs --service ocr-api,vllm-paddleocr --tail 100</code></pre>
         <summary>Health returns HTTP 200, but status is degraded.</summary>
         <div class="detail-body">
           <p>The API container is listening, but <code>vllm-paddleocr</code> is still loading weights or unreachable. Inspect <code>vllm-paddleocr</code> logs and confirm GPU memory availability before submitting documents.</p>
+          <p>If instead <code>/health</code> says <code>status=healthy</code> with <code>mode=archive_only</code> and <code>vllm=disabled</code>, nothing is wrong: the stack was started with <code>-ArchiveOnly</code> / <code>--archive-only</code> on purpose. Stored archives are readable; OCR returns with a plain <code>up</code> (after editing or overriding <code>OCR_ARCHIVE_ONLY</code> if <code>.env</code> fixes it to <code>true</code>).</p>
+          <p>In archive-only mode a <code>degraded</code> status means the archive bucket probe has not succeeded yet, or has failed: check the storage services; vLLM is not involved.</p>
+        </div>
+      </details>
+      <details id="help-archive-only">
+        <summary>Can I read my archives without the GPU?</summary>
+        <div class="detail-body">
+          <p>Yes. <code>pwsh .\stack.ps1 up -ArchiveOnly</code> or <code>bash stack.sh up --archive-only</code> starts the API, MCP and, when <code>COMPOSE_PROFILES=storage</code>, the storage profile, without <code>vllm-paddleocr</code> and without reserving a GPU, so no VRAM is allocated. The console opens on its Storage tab with Parse and OCR hidden, and together with the <code>/storage/*</code> routes and the MCP storage tools it works on everything archived earlier; the OCR routes answer <code>503 ocr_disabled_archive_only</code>. It needs storage and its browser enabled — see <a href="cli.html#archive-only">the CLI guide</a>.</p>
         </div>
       </details>
       <details id="help-office">

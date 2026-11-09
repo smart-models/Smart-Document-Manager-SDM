@@ -82,10 +82,17 @@ class AutotunePayload(ResponseModel):
 
 
 class HealthPayload(ResponseModel):
-    """Validate API readiness, model identity and backend reachability."""
+    """Validate API readiness, mode, model identity and backend reachability.
+
+    ``mode`` and ``ocr_enabled`` default to the OCR mode so an older API that
+    does not report them still validates; ``vllm="disabled"`` is the
+    archive-only API's deliberate absence of a model server, not an outage.
+    """
 
     status: Literal["healthy", "degraded"]
-    vllm: Literal["reachable", "unreachable"]
+    mode: Literal["ocr", "archive_only"] = "ocr"
+    vllm: Literal["reachable", "unreachable", "disabled"]
+    ocr_enabled: bool = True
     model: str
     pipeline_version: str
     version: str

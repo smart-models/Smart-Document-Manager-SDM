@@ -64,6 +64,8 @@ Options, listed under the command that accepts them:
 
 Launcher switches, each overriding its configured value for this run:
   --no-mcp / --mcp                MCP_SERVER_ENABLED
+  --archive-only                  OCR_ARCHIVE_ONLY=true for this run: stored archives only, no vLLM, no GPU;
+                                  no opposite switch -- edit or override the variable to return to OCR mode
   Passing both halves of a pair is a usage error, not last one wins.
 
 Precedence, highest first: the command line, the shell environment, the
@@ -152,7 +154,7 @@ compose_version_supported() {
 # them; the switch overrides are listed by the commands whose plan they change,
 # which includes verify because they change what its token preflight checks.
 GLOBAL_OPTIONS="dry-run env-file project-name"
-SWITCH_OPTIONS="no-mcp mcp"
+SWITCH_OPTIONS="no-mcp mcp archive-only"
 allowed_options_for() {
     case "$1" in
         up)
@@ -219,6 +221,7 @@ show_secrets=false
 dry_run=false
 no_mcp_flag=false
 mcp_flag=false
+archive_only_flag=false
 follow_logs=false
 remove_volumes=false
 remove_orphans=false
@@ -250,6 +253,7 @@ while (($#)); do
         --dry-run)      dry_run=true ;;
         --no-mcp)           no_mcp_flag=true ;;
         --mcp)              mcp_flag=true ;;
+        --archive-only)     archive_only_flag=true ;;
         --follow)           follow_logs=true ;;
         --volumes)          remove_volumes=true ;;
         --remove-orphans)   remove_orphans=true ;;
@@ -357,6 +361,7 @@ provided_options=()
 [[ "$dry_run" == true ]] && provided_options+=(dry-run)
 [[ "$no_mcp_flag" == true ]] && provided_options+=(no-mcp)
 [[ "$mcp_flag" == true ]] && provided_options+=(mcp)
+[[ "$archive_only_flag" == true ]] && provided_options+=(archive-only)
 [[ "$follow_logs" == true ]] && provided_options+=(follow)
 [[ "$remove_volumes" == true ]] && provided_options+=(volumes)
 [[ "$remove_orphans" == true ]] && provided_options+=(remove-orphans)
@@ -590,6 +595,7 @@ planner_input+="--cli-gpu-device=${gpu_device}"$'\n'
 # would put the same decision in two languages again.
 planner_input+="--cli-flag-mcp=${mcp_flag}"$'\n'
 planner_input+="--cli-flag-no-mcp=${no_mcp_flag}"$'\n'
+planner_input+="--cli-flag-archive-only=${archive_only_flag}"$'\n'
 planner_input+="--cli-flag-frontend=${frontend_flag}"$'\n'
 planner_input+="--cli-flag-no-frontend=${no_frontend_flag}"$'\n'
 planner_input+="--cli-compose-file=${COMPOSE_FILE}"$'\n'

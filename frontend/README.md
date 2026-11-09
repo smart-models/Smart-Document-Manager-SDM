@@ -96,6 +96,14 @@ Run all commands from `frontend/`:
   or `—` for servers that do not send it.
 - A selected json_rag whose `metadata.unprocessed_pages` is non-empty gets a
   `partial` tile in the RAG tab.
+- When `/health` reports `mode: "archive_only"` (or `ocr_enabled: false`), the
+  connection bar stays HEALTHY with `archive-only · vllm disabled` in its
+  detail, the Parse and OCR tabs are hidden (hash and arrow-key navigation
+  skip them) and Storage becomes the landing tab with no banner; RAG stays
+  usable and the Monitor shows vLLM as DISABLED (neutral, never DOWN) next to a
+  `mode` tile. A degraded archive-only server (bucket probe failing) keeps
+  DISABLED for vLLM but shows an alert that names the storage outage and never
+  claims the archives are available.
 - The STORAGE tab loads every `GET /storage/archives` cursor page of the current
   filters (`limit=50`, with progress in the status line) when the tab opens, a
   filter changes or Refresh runs. Everything else works on those rows without a

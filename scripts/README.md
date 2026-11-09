@@ -30,6 +30,8 @@ WSL stub, when testing the Bash launcher on Windows.
    checks before building. Builds finish before any running service is changed.
 3. Startup waits for vLLM, then local storage when selected, runs `storage-init`
    synchronously, waits for API calibration/readiness, and finally starts MCP.
+   In [archive-only mode](#archive-only-mode) the vLLM stage becomes a
+   stop/remove of any leftover model container and the API skips calibration.
 4. `down`, `logs`, `status`, `version` and `help` bypass Python. Recovery uses
    `.env.example` when no env file was explicitly selected, and includes the
    `storage` profile even if local `.env` is missing or malformed.
@@ -40,8 +42,9 @@ WSL stub, when testing the Bash launcher on Windows.
 |---|---|---|
 | [`../stack.ps1`](../stack.ps1), [`../stack.sh`](../stack.sh) | Arguments, prerequisites, recovery and execution | Changing shell interfaces or process handling |
 | [`stack_core.py`](stack_core.py) | Pure planner and structured config redaction | Changing service selection, startup order or endpoint summaries |
+| [`../compose.archive-only.yml`](../compose.archive-only.yml) | Overlay merged after `compose.yml` by archive-only runs: parks `vllm-paddleocr`, strips the API's vLLM dependency and GPU reservation, sets `OCR_ARCHIVE_ONLY=true` | Changing what archive-only mode removes from the standard shape |
 | [`verify_token_config.py`](verify_token_config.py) | API/MCP relationships and storage credentials | Changing supported authentication or storage roles |
-| [`verify_compose_security.py`](verify_compose_security.py) | Publication and hardening checks for both storage states | Changing the Compose security boundary |
+| [`verify_compose_security.py`](verify_compose_security.py) | Publication and hardening checks for all four Compose shapes: standard and archive-only, each with and without storage | Changing the Compose security boundary |
 | [`configure_storage.py`](configure_storage.py) | Explicit local credential generation | Changing storage setup |
 | [`../tests/test_stack_launchers.py`](../tests/test_stack_launchers.py) | Real-shell tests against fake Docker | Changing commands, flags, recovery or error handling |
 
@@ -55,7 +58,7 @@ positional: the application always requires an NVIDIA GPU. The optional
 |---|---|
 | `help` | Print usage; also the result of a bare invocation |
 | `version` | Report launcher, Engine and Compose versions; missing tools are reported without failure |
-| `verify` | Check tokens/storage and both Compose profile shapes; no daemon required |
+| `verify` | Check tokens/storage and all four Compose shapes (standard and archive-only, with and without storage); no daemon required |
 | `up` | Verify, build, start in readiness order and report configured URLs |
 | `build` | Build vLLM's security layer, `ocr-api` and, when enabled, `ocr-mcp`; start nothing |
 | `pull` | Refresh the pinned vLLM base and security layer (or pull a custom image), then selected storage images; failures propagate |
@@ -76,6 +79,7 @@ positional: the application always requires an NVIDIA GPU. The optional
 | `--wait-timeout <seconds>` | `-WaitTimeout <seconds>` | up | Positive per-stage readiness budget, default 3600; implies wait |
 | `--skip-verify` | `-SkipVerify` | up | Explicitly bypass the security preflight |
 | `--mcp` / `--no-mcp` | `-Mcp` / `-NoMcp` | up/config/verify/build/pull/restart/urls | Override `MCP_SERVER_ENABLED`; disabled MCP is stopped/removed during up |
+| `--archive-only` | `-ArchiveOnly` | up/config/verify/build/pull/restart/urls | Force `OCR_ARCHIVE_ONLY=true` for this run: serve stored archives with no `vllm-paddleocr`, no GPU reservation and the OCR routes disabled; needs `OCR_STORAGE_ENABLED` and `OCR_STORAGE_BROWSER_ENABLED`, see [Archive-only mode](#archive-only-mode) |
 | `--frontend` / `--no-frontend` | `-Frontend` / `-NoFrontend` | up/config | Override the API's `EXPOSE_FRONTEND` setting |
 | `--gpu-device <index>` | `-GpuDevice <index>` | up/config | Override `OCR_GPU_DEVICE`: the one Docker/NVIDIA GPU index both `vllm-paddleocr` and `ocr-api` reserve |
 | `--show-secrets` | `-ShowSecrets` | config | Print unredacted config, with an explicit stderr warning |
@@ -94,6 +98,9 @@ without confirmation is refused. A dry run does not ask for destructive confirma
 
 `config` continues to show all Compose service definitions, including MCP when
 disabled: disabling MCP affects launcher execution, not the Compose model.
+Archive-only is different: `config` renders the merged overlay, so
+`vllm-paddleocr` is absent and `ocr-api` carries neither `depends_on` nor a
+GPU reservation.
 
 ## Configuration
 
@@ -128,6 +135,17 @@ build output tag and that explicit command would overwrite the local custom tag.
   subsequent steps. No API startup is issued after storage provisioning fails.
 - Disabling the storage profile excludes it from future start/restart plans;
   already running storage containers remain until explicitly stopped or `down`.
+- [Archive-only mode](#archive-only-mode) never builds, pulls, starts, restarts
+  or waits for `vllm-paddleocr`; `up` stops and removes a model container left
+  by a normal run and keeps every volume. The planner refuses the mode before
+  any step unless `OCR_STORAGE_ENABLED` and `OCR_STORAGE_BROWSER_ENABLED` are
+  true. A later `up` without the flag restores the standard dependencies, GPU
+  reservation, calibration and healthcheck, unless `.env` sets
+  `OCR_ARCHIVE_ONLY=true`: that default is the launchers' resolved environment,
+  so edit it, or override it for one run from the shell
+  (`OCR_ARCHIVE_ONLY=false bash stack.sh up`; in PowerShell
+  `$env:OCR_ARCHIVE_ONLY='false'; pwsh .\stack.ps1 up`). Neither switch deletes
+  archives, buckets, volumes or model caches.
 - API/MCP/storage containers have explicit non-root users, read-only root
   filesystems, dropped capabilities and no-new-privileges. The named upstream
   **vLLM exception** retains its image's user/writable filesystem for model
@@ -147,6 +165,40 @@ MCP's healthcheck proves its TCP listener is reachable, not authenticated tool
 discovery. `verify` checks configuration without contacting model/S3 services.
 It checks the actual single API token and MCP list; the API does not accept an
 additional service token automatically. Disabling MCP omits MCP auth checks.
+
+### Archive-only mode
+
+`pwsh .\stack.ps1 up -ArchiveOnly` / `bash stack.sh up --archive-only` consult
+the documents already archived in S3 — through the console, REST `/storage/*`
+and the MCP storage tools — while `vllm-paddleocr` stays stopped and no service
+reserves a GPU, so the stack allocates no VRAM. The launchers merge
+[`compose.archive-only.yml`](../compose.archive-only.yml) after `compose.yml`;
+`OCR_ARCHIVE_ONLY=true` in `.env` makes the mode the configured default and the
+flag forces it for one run; with that default set, a plain `up` stays
+archive-only until the value is edited or overridden from the shell
+(`OCR_ARCHIVE_ONLY=false`), because shell variables outrank the env file. It
+needs `OCR_STORAGE_ENABLED=true`,
+`OCR_STORAGE_BROWSER_ENABLED=true` and archives created by earlier OCR runs:
+nothing new is recognized, `--gpu-device` / `-GpuDevice` is refused together
+with it and `OCR_GPU_DEVICE` in `.env` is ignored for that run.
+
+| Command | Archive-only behaviour |
+|---|---|
+| `up` | Verify; build `ocr-api` and, when enabled, `ocr-mcp`; stop and remove a leftover `vllm-paddleocr` container (volumes kept); start storage and run `storage-init` when the profile is selected; start `ocr-api` without calibration and wait for its health; start MCP |
+| `build` | Build `ocr-api` and `ocr-mcp` only |
+| `pull` | Pull the storage images only; the vLLM image is neither built nor pulled |
+| `restart` | Restart storage, `ocr-api` and `ocr-mcp`; `vllm-paddleocr` is not touched, so a model container left by OCR mode stays up: switching modes needs `up` |
+| `config` | Render the merged overlay: no `vllm-paddleocr`, `ocr-api` without `depends_on` or GPU reservation, `OCR_ARCHIVE_ONLY=true` |
+| `verify` | The same token/storage preflight; `verify_compose_security.py` always validates the standard and the archive-only shapes, each with and without storage |
+| `urls` | Report the mode and `vLLM API / Swagger: not started (archive-only)` |
+| `--dry-run` / `-DryRun` | Print the steps above without building, removing, starting or waiting |
+
+Inside the API, `/parse`, `/ocr` and `/parse/chunks` answer `503` with
+`{"detail": {"code": "ocr_disabled_archive_only", "message": "OCR inference is disabled in archive-only mode."}}`,
+`/health` reports `mode=archive_only`, `vllm=disabled` and `ocr_enabled=false`,
+`healthy` once the archive bucket probe has succeeded, and `/chunk`,
+`/office/pdf`, `/storage/*`, `/stats` and `/metrics` keep working
+([API reference](../ocrserver/README.md#behaviour-contracts)).
 
 ## Recipes
 
@@ -213,6 +265,17 @@ python3 scripts/configure_storage.py
 bash stack.sh up --wait
 ```
 
+**Consult existing archives without a GPU** — storage must already be
+configured; nothing is recognized and no VRAM is allocated:
+
+```powershell
+pwsh .\stack.ps1 up -ArchiveOnly -Wait
+```
+
+```bash
+bash stack.sh up --archive-only --wait
+```
+
 **Stop while retaining model caches and archives:**
 
 ```powershell
@@ -250,6 +313,8 @@ OCR quality, IAM provisioning against live storage or cold-start timing.
 | Volume deletion refused | Use the normal stop to keep data, or explicitly confirm destructive removal as described above. |
 | Configuration edits seem ignored | `restart` retains old environment. Recreate with `up`; check shell overrides and `config`. |
 | Stack runs on the wrong GPU | Pass `--gpu-device` / `-GpuDevice` to `up`, or set `OCR_GPU_DEVICE`; `docker exec vllm-paddleocr nvidia-smi -L` must list one GPU. A new GPU model recalibrates. |
+| `Archive-only mode needs OCR_STORAGE_ENABLED=true and OCR_STORAGE_BROWSER_ENABLED=true` | Run `python scripts/configure_storage.py` against the selected env file (archives must already exist), or start without the flag and with `OCR_ARCHIVE_ONLY` unset or false in `.env`. |
+| OCR refused with `503 ocr_disabled_archive_only` | The stack is in [archive-only mode](#archive-only-mode); run `up` without the flag, after setting or overriding `OCR_ARCHIVE_ONLY=false` if `.env` fixes it to `true`. |
 
 | Exit code | Meaning |
 |---|---|
@@ -263,7 +328,8 @@ parameter value, can exit 1 before the script body. Bash reports those as 2.
 
 ## Invariants
 
-`tests/test_stack_core.py` pins startup ordering and service selection.
+`tests/test_stack_core.py` pins startup ordering and service selection,
+including the archive-only plan.
 `tests/test_stack_verifiers.py` pins credential and publication boundaries.
 `tests/test_stack_launchers.py` pins both shells' argv parity, default redaction,
 recovery and destructive confirmation. Keep these synchronized with the flag

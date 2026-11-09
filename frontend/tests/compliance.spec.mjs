@@ -1,4 +1,4 @@
-import { CONFIG, expect, test, openHealthyConsole, withApi } from "./fixtures.mjs";
+import { CONFIG, HEALTH, expect, test, openHealthyConsole, withApi } from "./fixtures.mjs";
 
 async function openConsole(page, hash = "") {
   const external = [];
@@ -54,6 +54,67 @@ test("degraded backend explains accessible locks and leaves diagnostics availabl
   await expect(page.locator("#service-gate [role=alert]")).toContainText("OCR backend unavailable");
   await page.locator("#tab-monitor").click();
   await expect(page.locator("#panel-monitor")).not.toHaveAttribute("inert", "");
+});
+
+test("archive-only health keeps the API healthy, hides the OCR tabs and lands on Storage", async ({ page }) => {
+  await page.route("**/health", route => route.fulfill({
+    json: { ...HEALTH, mode: "archive_only", vllm: "disabled", ocr_enabled: false },
+  }));
+  await page.goto("/");
+  // The connection bar reports a healthy server, with the mode in its detail.
+  await expect(page.locator("#conn-health-status")).toHaveText("HEALTHY");
+  await expect(page.locator("#conn-health")).toHaveClass(/\bok\b/);
+  await expect(page.locator("#conn-health-detail")).toContainText("archive-only · vllm disabled");
+  // Parse and OCR disappear; Storage is the landing tab and no banner is shown.
+  await expect(page.locator("#tab-parse")).toBeHidden();
+  await expect(page.locator("#tab-ocr")).toBeHidden();
+  await expect(page.locator("#tab-storage")).toHaveAttribute("aria-selected", "true");
+  await expect(page.locator("#panel-storage")).toBeVisible();
+  await expect(page.locator("#panel-parse")).toBeHidden();
+  await expect(page).toHaveURL(/#storage$/);
+  await expect(page.locator("#service-gate .alert")).toHaveCount(0);
+  for (const id of ["storage-root", "rag-root", "rag-storage-root", "rag-execution-root"]) {
+    await expect(page.locator(`#${id}`), id).not.toHaveAttribute("inert", "");
+  }
+  // A hash pointing at a hidden tab falls back to Storage; arrows skip hidden tabs.
+  await page.goto("/#parse");
+  await expect(page.locator("#tab-storage")).toHaveAttribute("aria-selected", "true");
+  await page.locator("#tab-rag").click();
+  await page.locator("#tab-rag").press("ArrowLeft");
+  await expect(page.locator("#tab-monitor")).toHaveAttribute("aria-selected", "true");
+  await page.locator("#tab-monitor").press("Home");
+  await expect(page.locator("#tab-rag")).toHaveAttribute("aria-selected", "true");
+  await page.locator("#tab-storage").click();
+  // Monitor shows vLLM as DISABLED (neutral) and names the mode, never DOWN.
+  await page.locator("#tab-monitor").click();
+  await expect(page.locator("#mon-badges")).toContainText("DISABLED");
+  await expect(page.locator("#mon-badges")).not.toContainText("DOWN");
+  await expect(page.locator("#mon-badges .metric-value.muted")).toHaveText("DISABLED");
+  await expect(page.locator("#mon-model")).toContainText("archive_only");
+});
+
+test("a degraded archive-only server reports its storage outage instead of promising archives", async ({ page }) => {
+  await page.route("**/health", route => route.fulfill({
+    json: {
+      ...HEALTH, status: "degraded", mode: "archive_only", vllm: "disabled", ocr_enabled: false,
+      storage: { status: "error", last_operation: "probe", timestamp: "2026-11-09T10:00:00+00:00" },
+    },
+  }));
+  await page.goto("/");
+  await expect(page.locator("#conn-health-status")).toHaveText("DEGRADED");
+  await expect(page.locator("#conn-health")).toHaveClass(/\bbad\b/);
+  await expect(page.locator("#conn-health-detail")).toContainText("archive-only · vllm disabled");
+  const banner = page.locator("#service-gate .alert");
+  await expect(banner).toHaveAttribute("role", "alert");
+  await expect(banner).toContainText("STORAGE UNREACHABLE");
+  await expect(banner).not.toContainText("stay available");
+  await expect(page.locator("#tab-parse")).toBeHidden();
+  await expect(page.locator("#tab-ocr")).toBeHidden();
+  // The outage is a storage problem, not a model problem: vLLM stays DISABLED.
+  await page.locator("#tab-monitor").click();
+  await expect(page.locator("#mon-badges")).toContainText("DISABLED");
+  await expect(page.locator("#mon-badges")).not.toContainText("DOWN");
+  await expect(page.locator("#mon-storage")).toContainText("DOWN");
 });
 
 test.describe("without a registered key", () => {

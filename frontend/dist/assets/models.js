@@ -12,12 +12,14 @@ export function uppercaseMessage(message) {
 }
 
 // Status badge tile: same look as metricTiles, with the state color on the
-// value. `state` is true/"up", "degraded", "unknown" or false/"down": a server
-// answering degraded, or one that cannot be asked, is not reported as down.
-const STATUS_WORDS = { up: "UP", degraded: "DEGRADED", unknown: "UNKNOWN", down: "DOWN" };
+// value. `state` is true/"up", "degraded", "unknown", "disabled" or
+// false/"down": a server answering degraded, or one that cannot be asked, is
+// not reported as down, and a component switched off on purpose (vLLM in
+// archive-only mode) is neutral rather than a warning.
+const STATUS_WORDS = { up: "UP", degraded: "DEGRADED", unknown: "UNKNOWN", disabled: "DISABLED", down: "DOWN" };
 export function statusTile(label, state, detail = "") {
   const key = state === true ? "up" : state === false ? "down" : STATUS_WORDS[state] ? state : "unknown";
-  const tone = key === "up" ? "up" : key === "down" ? "down" : "warn";
+  const tone = key === "up" ? "up" : key === "down" ? "down" : key === "disabled" ? "muted" : "warn";
   return `<div class="metric"><div class="metric-label">${esc(label)}</div>` +
     `<div class="metric-value ${tone}">` +
     `${esc(`${STATUS_WORDS[key]}${detail ? ` ${detail}` : ""}`)}</div></div>`;
@@ -500,8 +502,8 @@ export const PARSE_HELP = buildParseHelp();
 export const OCR_HELP = buildOcrHelp();
 
 export const MONITORING_HELP = {
-  "01 Status": "Shows the API health and the reachability of its vLLM backend. UP means the reported component is available; DEGRADED health indicates an unreachable OCR backend, which pauses Parse and OCR submissions. UNKNOWN means /health could not be read; status refreshes while Monitor is active and polling pauses in hidden browser tabs.",
-  "02 Model": "Shows the model ID, server version and pipeline version reported by /health. Use these values to check the identity reported after a deployment and include them when describing an OCR issue. If health information is unavailable, the panel explains the failure rather than presenting old values as current.",
+  "01 Status": "Shows the API health and the reachability of its vLLM backend. UP means the component is available; DEGRADED health indicates an unreachable OCR backend, which pauses Parse and OCR submissions. In archive-only mode the API is UP while vLLM reads DISABLED: the Parse and OCR tabs are hidden, Storage and RAG keep working. UNKNOWN means /health could not be read; polling pauses in hidden tabs.",
+  "02 Model": "Shows the mode (ocr or archive_only), model ID, server version and pipeline version reported by /health. Use these values to check the identity reported after a deployment and include them when describing an OCR issue. If health information is unavailable, the panel explains the failure rather than presenting old values as current.",
   "03 Stats": "Shows parse requests holding a queue slot, active Parse and OCR admissions, total requests and rejected requests. The first two values describe current work, not a waiting backlog. Totals come from Prometheus and include rejected responses, so total and rejected requests overlap; Reset counters changes the displayed request totals.",
   "Reset counters": "Resets the displayed request and rejection totals to a baseline taken from the latest metrics snapshot. Endpoint request and error counts follow that baseline; latency and storage counters retain their lifetime values. This changes the view only; reloading the page restores raw totals, and process restarts clear the baseline.",
   Chart: "Plots total requests over time: one sample per successful metrics tick, kept to the last 120 (about ten minutes of polling). The x-axis is by sample index, not wall-clock, so gaps from failed ticks or time spent on other tabs are not drawn. Hover the plot for the exact value at a sample; the series clears on Reset counters, a process restart and page reloads.",

@@ -296,6 +296,7 @@ Layer key: M = UI-mock · L = UI-live · B = Backend · S = Static.
 | SDM-MON-011 | M | `audit-console.spec.mjs` | Reset keeps keyboard focus across refreshes |
 | SDM-MON-012 | M | `console.spec.mjs` | Health retests share probe; invalid nested metadata locks submissions; valid probe recovers; unexpected health rejection closes gate |
 | SDM-MON-013 | L | `live.spec.mjs` | Real `#conn-health-status` HEALTHY; `#mon-stats`/`#mon-table` populated after real parse+ocr |
+| SDM-MON-014 | M | `compliance.spec.mjs` | Archive-only health (`mode=archive_only`, `vllm=disabled`): connection bar HEALTHY with the mode in its detail, Parse and OCR tabs hidden (a hash pointing at them and arrow keys fall back to the visible tabs), Storage is the landing tab, no banner, RAG usable, Monitor shows vLLM DISABLED (neutral, never DOWN) and the mode tile; degraded archive-only (`storage.status=error`) shows DEGRADED and an alert naming the storage outage instead of promising archives |
 
 <a id="crosscutting"></a>
 

@@ -10,6 +10,7 @@ from scripts.stack_core import (
     build_plan,
     redact_config,
     render_shell,
+    sibling,
 )
 
 
@@ -190,3 +191,93 @@ def test_redaction_includes_the_aws_access_key_id_alias_used_by_seaweedfs():
             "AWS_SECRET_ACCESS_KEY": "<redacted>",
         }
     }
+
+
+ARCHIVE_ENV = {"OCR_STORAGE_ENABLED": "true", "OCR_STORAGE_BROWSER_ENABLED": "true"}
+
+
+def test_archive_only_up_never_builds_starts_or_waits_for_vllm_or_a_gpu():
+    result = plan(
+        env={**ARCHIVE_ENV, "COMPOSE_PROFILES": "storage"},
+        **{"flag-archive-only": "true"},
+    )
+    assert result.resolved["archive_only"] == "true"
+    assert result.resolved["gpu_device"] == ""
+    assert result.environment == {"OCR_ARCHIVE_ONLY": "true"}
+    assert all(
+        any(arg.endswith("compose.archive-only.yml") for arg in step.argv)
+        for step in result.steps
+    )
+    assert result.steps[0].argv[-3:] == ["build", "ocr-api", "ocr-mcp"]
+    starts = [step.argv for step in result.steps if "up" in step.argv]
+    assert starts and not any("vllm-paddleocr" in argv for argv in starts)
+    removal = next(
+        i
+        for i, step in enumerate(result.steps)
+        if step.argv[-4:] == ["rm", "--stop", "--force", "vllm-paddleocr"]
+    )
+    launches = [
+        (i, step.argv[-1])
+        for i, step in enumerate(result.steps)
+        if "up" in step.argv or "run" in step.argv
+    ]
+    assert removal < launches[0][0]
+    assert [target for _, target in launches] == [
+        "storage-gateway",
+        "storage-init",
+        "ocr-api",
+        "ocr-mcp",
+    ]
+    assert "archive-only" in " ".join(result.messages).lower()
+    assert "NVIDIA GPU" not in " ".join(result.messages)
+    summary = " ".join(result.summary)
+    assert "archive-only" in summary and "8081" not in summary
+
+
+def test_archive_only_from_the_env_file_covers_every_planned_command():
+    env = {**ARCHIVE_ENV, "OCR_ARCHIVE_ONLY": "true", "COMPOSE_PROFILES": "storage"}
+    assert plan("build", env=env).steps[0].argv[-3:] == ["build", "ocr-api", "ocr-mcp"]
+    pull = plan("pull", env=env)
+    assert [step.argv[-3:] for step in pull.steps] == [
+        ["pull", "seaweedfs", "storage-gateway"]
+    ]
+    assert plan("pull", env={**env, "COMPOSE_PROFILES": ""}).steps == []
+    restart = plan("restart", env=env)
+    assert len(restart.steps) == 1 and "vllm-paddleocr" not in restart.steps[0].argv
+    config = plan("config", env=env)
+    assert config.steps[0].argv.count("--file") == 2
+    assert config.environment == {}  # configured, not forced: nothing to export
+    assert plan("urls", env=env).resolved["archive_only"] == "true"
+    custom = plan("pull", env={**env, "OCR_VLLM_IMAGE": "registry.example/ocr:x"})
+    assert not any("vllm-paddleocr" in step.argv for step in custom.steps)
+    assert custom.warnings == []
+
+
+def test_archive_only_refuses_incomplete_storage_and_gpu_selection():
+    for env in (
+        {},
+        {"OCR_STORAGE_ENABLED": "true"},
+        {"OCR_STORAGE_BROWSER_ENABLED": "true"},
+    ):
+        with pytest.raises(ConfigurationError, match="OCR_STORAGE_BROWSER_ENABLED"):
+            plan(env=env, **{"flag-archive-only": "true"})
+    with pytest.raises(ConfigurationError, match="OCR_STORAGE_BROWSER_ENABLED"):
+        plan("verify", env={"OCR_ARCHIVE_ONLY": "true"})
+    with pytest.raises(ConfigurationError, match="gpu-device"):
+        plan(env=ARCHIVE_ENV, **{"flag-archive-only": "true", "gpu-device": "1"})
+
+
+def test_standard_plan_is_unchanged_without_archive_only():
+    result = plan(env=ARCHIVE_ENV)
+    assert result.resolved["archive_only"] == "false"
+    assert not any("compose.archive-only.yml" in step.argv for step in result.steps)
+    assert not any("rm" in step.argv for step in result.steps)
+    assert "8081" in " ".join(result.summary)
+
+
+def test_sibling_keeps_the_callers_separator_style():
+    assert (
+        sibling("/repo with spaces/compose.yml", "x.yml") == "/repo with spaces/x.yml"
+    )
+    assert sibling(r"C:\repo\compose.yml", "x.yml") == r"C:\repo\x.yml"
+    assert sibling("compose.yml", "x.yml") == "x.yml"

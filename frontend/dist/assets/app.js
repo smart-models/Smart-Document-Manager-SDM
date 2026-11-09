@@ -104,11 +104,20 @@ tablist.addEventListener("click", (event) => {
   if (name === "rag") ragStoragePanel.activate();
   else ragStoragePanel.deactivate();
 });
+// Archive-only has no OCR to offer: the Parse and OCR tabs disappear and a
+// visitor lands on Storage, which is what that mode exists for.
+const INFERENCE_TABS = ["parse", "ocr"];
+const defaultTab = () => document.getElementById(archiveOnly ? "tab-storage" : "tab-parse");
 function activateHashTab() {
   const name = window.location.hash.slice(1);
   const tab = [...tablist.querySelectorAll('[role="tab"]')]
-    .find((item) => item.dataset.tab === name);
-  (tab || document.getElementById("tab-parse")).click();
+    .find((item) => item.dataset.tab === name && !item.hidden);
+  (tab || defaultTab()).click();
+}
+function applyArchiveOnlyTabs() {
+  for (const name of INFERENCE_TABS) document.getElementById(`tab-${name}`).hidden = archiveOnly;
+  const active = tablist.querySelector('[aria-selected="true"]')?.dataset.tab;
+  if (archiveOnly && INFERENCE_TABS.includes(active)) defaultTab().click();
 }
 window.addEventListener("hashchange", activateHashTab);
 fillReference("parse-reference", buildParseHelp(uiLimits));
@@ -134,6 +143,12 @@ const ragStoragePanel = mountRagStorage(document.getElementById("rag-storage-roo
 // the backend is degraded or unreachable (Monitor stays open on purpose —
 // it is where the outage is diagnosed).
 let servicesReady = false;
+// True while /health reports mode "archive_only": OCR is off by design, so
+// the Parse and OCR tabs are hidden instead of raising an alarm. apiHealthy keeps the
+// server's own status apart from it: an archive-only server whose bucket is
+// unreachable is degraded, and must not be described as serving archives.
+let archiveOnly = false;
+let apiHealthy = false;
 
 // "ok", "missing" or "rejected" (see initApiKey). Anything but "ok" locks every
 // tab that calls a protected endpoint; Monitor stays open for diagnosis.
@@ -147,8 +162,13 @@ const canRun = () => servicesReady && authState === "ok";
 
 function renderServiceGate() {
   const alerts = [];
-  if (!servicesReady) alerts.push(alertHtml("error",
-    "OCR backend unavailable — new parses and recognitions are paused until /health reports healthy. Results already shown stay available. See the Monitor tab for details."));
+  // A healthy archive-only server needs no banner: its Parse and OCR tabs
+  // are hidden, so nothing on screen is waiting for OCR.
+  if (!servicesReady && !(archiveOnly && apiHealthy)) alerts.push(archiveOnly
+    ? alertHtml("error",
+      "ARCHIVE-ONLY MODE, STORAGE UNREACHABLE — this server runs without vLLM, and /health reports its archive bucket as unavailable, so stored archives cannot be read until storage recovers. OCR stays disabled by the operator. See the Monitor tab for details.")
+    : alertHtml("error",
+      "OCR backend unavailable — new parses and recognitions are paused until /health reports healthy. Results already shown stay available. See the Monitor tab for details."));
   if (authState !== "ok") alerts.push(alertHtml("error", AUTH_MESSAGES[authState]));
   // setHtml: the assertive region must not re-announce an unchanged banner.
   setHtml(document.getElementById("service-gate"), alerts.join(""));
@@ -172,6 +192,7 @@ function applyLockdowns() {
     if (locked) keepFocus(region.contains(document.activeElement) ? document.activeElement : null, fallback);
     setRegionLocked(region, locked);
   }
+  applyArchiveOnlyTabs();
   renderServiceGate();
   refreshRunButtons();
 }
@@ -199,11 +220,15 @@ async function pollHealthInner() {
     const data = result.data;
     const validationError = validateHealthResponse(data);
     if (validationError) throw new Error(validationError);
-    servicesReady = data.status === "healthy";
-    el.className = `conn-health ${servicesReady ? "ok" : "bad"}`;
+    archiveOnly = data.mode === "archive_only" || data.ocr_enabled === false;
+    apiHealthy = data.status === "healthy";
+    servicesReady = apiHealthy && !archiveOnly;
+    el.className = `conn-health ${apiHealthy ? "ok" : "bad"}`;
     setText(status, data.status.toUpperCase());
-    detail.textContent = `vllm ${data.vllm} · ${data.model} · ${result.elapsed.toFixed(3)}s`;
+    detail.textContent = `${archiveOnly ? "archive-only · " : ""}vllm ${data.vllm} · ${data.model} · ${result.elapsed.toFixed(3)}s`;
   } catch (error) {
+    archiveOnly = false;
+    apiHealthy = false;
     servicesReady = false;
     el.className = "conn-health bad";
     setText(status, "UNREACHABLE");
@@ -1029,7 +1054,11 @@ async function monitorTickInner(signal) {
     : String(hd.status || "").toLowerCase() === "healthy" ? "up"
       : String(hd.status || "").toLowerCase() === "degraded" ? "degraded" : "down";
   const vllmRaw = String(hd.vllm || "").toLowerCase();
-  const vllmState = !healthOk ? "unknown" : vllmRaw === "reachable" ? "up" : "down";
+  // "disabled" is the archive-only API's deliberate absence of a model
+  // server: shown neutral, never as DOWN.
+  const vllmState = !healthOk ? "unknown"
+    : vllmRaw === "reachable" ? "up"
+      : vllmRaw === "disabled" ? "disabled" : "down";
   setHtml(document.getElementById("mon-badges"), `<div class="metric-row">` +
     statusTile("health", healthState, healthState === "down" ? String(hd.status || "") : "") +
     statusTile("vllm", vllmState, vllmState === "down" ? vllmRaw : "") +
@@ -1039,6 +1068,7 @@ async function monitorTickInner(signal) {
   const healthFailure = health.ok ? healthError : health.status ? `/health answered ${health.error || `HTTP ${health.status}`}` : "server unreachable";
   setHtml(document.getElementById("mon-model"), healthOk
     ? metricTiles([
+        ["mode", hd.mode || "ocr"],
         ["model", hd.model || "—"],
         ["version", hd.version || "—"],
         ["pipeline", hd.pipeline_version || "—"],

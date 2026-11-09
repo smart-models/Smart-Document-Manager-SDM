@@ -1,0 +1,17 @@
+# Archive-only overlay for compose.yml: read stored OCR archives with no vLLM
+# container and no GPU. Select it only through the launchers:
+#   pwsh .\stack.ps1 up -ArchiveOnly      bash stack.sh up --archive-only
+# They merge this file after compose.yml. The overlay never changes the
+# standard shape: compose.yml alone still describes the full GPU stack.
+services:
+  vllm-paddleocr:
+    # Parked under a profile nobody enables: the service leaves the resolved
+    # model, so neither `up` nor `config` can reach it or its GPU reservation.
+    profiles: [ocr-inference]
+  ocr-api:
+    # No vLLM to wait for, no NVIDIA device to reserve: PaddleOCR layout and
+    # VL recognition never start in this mode (see OCR_ARCHIVE_ONLY).
+    depends_on: !reset {}
+    deploy: !reset {}
+    environment:
+      OCR_ARCHIVE_ONLY: "true"

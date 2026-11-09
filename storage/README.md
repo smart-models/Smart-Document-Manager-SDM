@@ -48,6 +48,13 @@ by the operator via `python scripts/configure_storage.py` before starting the
    `ocrserver.storage_index.rebuild_index` after reconciling IAM policies and
    lifecycle rules, so each `up` brings the archive index back in line with the
    bucket.
+5. **Archive-only consultation.** `stack.* up --archive-only` / `-ArchiveOnly`
+   serves the archives this profile holds without `vllm-paddleocr` or any GPU
+   reservation: `storage-init` still runs first, `ocr-api` starts with
+   `OCR_ARCHIVE_ONLY=true`, and the console STORAGE/RAG tabs plus the MCP
+   storage tools list, download, refine and delete as usual while new OCR is
+   refused with `503 ocr_disabled_archive_only`. Both `OCR_STORAGE_ENABLED` and
+   `OCR_STORAGE_BROWSER_ENABLED` must be true; the mode creates no archives.
 
 ## Map of the code
 
@@ -140,6 +147,17 @@ pwsh .\stack.ps1 up -Wait
 python3 scripts/configure_storage.py
 bash stack.sh verify
 bash stack.sh up --wait
+```
+
+**Consult existing archives without a GPU (archive-only):** the storage
+profile starts and provisions as usual, the model server does not.
+
+```powershell
+pwsh .\stack.ps1 up -ArchiveOnly -Wait
+```
+
+```bash
+bash stack.sh up --archive-only --wait
 ```
 
 **Split the Markdown of archives written before schema 3 into one file per

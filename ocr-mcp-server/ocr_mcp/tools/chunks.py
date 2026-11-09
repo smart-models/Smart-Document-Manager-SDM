@@ -145,8 +145,9 @@ def register(mcp: MCPServer, ctx) -> None:
         Don't use when: recognizing a crop; use ocr_recognize_image.
 
         Error Handling:
-            One source and valid options required. JSON mode skips model health;
-            document mode performs health preflight. Strict protected overflow
+            One source and valid options required. JSON mode skips model health
+            and works on an archive-only API; document mode performs the health
+            preflight and is refused there without a POST. Strict protected overflow
             fails atomically; change budget/protection only with user intent.
             Input/output limits return explicit REST recovery, never partial
             chunks or a fictional server file. 503 capacity can be retried

@@ -53,6 +53,9 @@ param(
     # putting it here would put the same decision in two languages again.
     [switch]$NoMcp,
     [switch]$Mcp,
+    # Archive-only reads stored archives with no vLLM container and no GPU;
+    # OCR_ARCHIVE_ONLY in the env file is the configured default it forces on.
+    [switch]$ArchiveOnly,
 
     [switch]$Follow,
     [switch]$Volumes,
@@ -151,6 +154,8 @@ Options, listed under the command that accepts them:
 
 Launcher switches, each overriding its configured value for this run:
   -NoMcp / -Mcp                   MCP_SERVER_ENABLED
+  -ArchiveOnly                    OCR_ARCHIVE_ONLY=true for this run: stored archives only, no vLLM, no GPU;
+                                  no opposite switch -- edit or override the variable to return to OCR mode
   Passing both halves of a pair is a usage error, not last one wins.
 
 Precedence, highest first: the command line, the shell environment, the
@@ -231,7 +236,7 @@ function Test-ComposeVersionSupported {
 # the switch overrides are listed by the commands whose plan they change,
 # which includes verify because they change what its token preflight checks.
 $globalOptions = @("dry-run", "env-file", "project-name")
-$switchOptions = @("no-mcp", "mcp")
+$switchOptions = @("no-mcp", "mcp", "archive-only")
 $allowedOptions = @{
     "up"     = @(
         "no-build", "wait", "wait-timeout",
@@ -273,6 +278,7 @@ $optionDisplayNames = @{
     "yes"               = "-Yes"
     "no-mcp"            = "-NoMcp"
     "mcp"               = "-Mcp"
+    "archive-only"      = "-ArchiveOnly"
 }
 
 $script:dryRunIndex = 0
@@ -345,6 +351,7 @@ if ($ShowSecrets) { $providedOptions += "show-secrets" }
 if ($DryRun) { $providedOptions += "dry-run" }
 if ($NoMcp) { $providedOptions += "no-mcp" }
 if ($Mcp) { $providedOptions += "mcp" }
+if ($ArchiveOnly) { $providedOptions += "archive-only" }
 if ($Follow) { $providedOptions += "follow" }
 if ($Volumes) { $providedOptions += "volumes" }
 if ($RemoveOrphans) { $providedOptions += "remove-orphans" }
@@ -611,6 +618,7 @@ try {
     foreach ($pair in @(
         @("flag-mcp", $Mcp),
         @("flag-no-mcp", $NoMcp),
+        @("flag-archive-only", $ArchiveOnly),
         @("flag-frontend", $Frontend),
         @("flag-no-frontend", $NoFrontend)
     )) {

@@ -900,7 +900,7 @@
       <article class="card">
         <span class="eyebrow">Route E / Archive</span>
         <h3>/storage/* and /parse/progress/{id}</h3>
-        <p>With the storage profile, <code>/storage/*</code> lists, downloads, deletes and refines archived jobs through the S3 gateway — no GPU, exact confirmation for deletes. <code>GET /parse/progress/{id}</code> reports a running parse; the MCP parse tool polls it.</p>
+        <p>With the storage profile, <code>/storage/*</code> lists, downloads, deletes and refines archived jobs through the S3 gateway — no GPU, exact confirmation for deletes. <code>GET /parse/progress/{id}</code> reports a running parse; the MCP parse tool polls it. In archive-only mode (<code>--archive-only</code> / <code>-ArchiveOnly</code>) these routes, <code>/chunk</code> and <code>/office/pdf</code> are the data routes that keep working, while <code>/health</code>, <code>/stats</code> and <code>/metrics</code> answer as usual: <code>vllm-paddleocr</code> is not started, no GPU is reserved and <code>/parse</code>, <code>/ocr</code> and <code>/parse/chunks</code> answer <code>503 ocr_disabled_archive_only</code>.</p>
       </article>
     </div>
   </div>
@@ -1064,6 +1064,7 @@
         <details id="glossary-autotune"><summary>What is autotune?</summary><p>Pre-start calibration: <code>vllm-paddleocr</code> writes a hardware manifest, then <code>ocr-api</code> measures concurrency settings against quality and stability gates and persists a fingerprint-bound profile.</p></details>
         <details id="glossary-tier"><summary>What is a GPU tier?</summary><p>The capacity band the Stage-1 entrypoint detects from VRAM and compute capability. It selects vLLM startup flags such as max sequences — 16 below 16 GiB, 32 from 16 GiB, 64 from 24 GiB — unless you override them.</p></details>
         <details id="glossary-archive"><summary>What is the archive?</summary><p>The optional <code>storage</code> Compose profile: SeaweedFS S3 behind an nginx gateway, provisioned by a one-shot init with four least-privilege roles — writer, browser, reader, and an admin key the API never sees.</p></details>
+        <details id="glossary-archive-only"><summary>What is archive-only mode?</summary><p>A launcher mode (<code>-ArchiveOnly</code> / <code>--archive-only</code>, or <code>OCR_ARCHIVE_ONLY=true</code>) that starts <code>ocr-api</code>, MCP and, with <code>COMPOSE_PROFILES=storage</code>, the storage profile without <code>vllm-paddleocr</code> or any GPU reservation, through the <code>compose.archive-only.yml</code> overlay. Stored archives stay readable through the console, <code>/storage/*</code> and the MCP storage tools; inference routes refuse with <code>503 ocr_disabled_archive_only</code>, autotune does not run and <code>/health</code> reports <code>vllm=disabled</code>, healthy once the archive bucket answers.</p></details>
       </dl>
       <div>
         <h3 class="reference-heading">Go one level deeper.</h3>
@@ -1096,7 +1097,7 @@
       <details id="help-architecture-health">
         <summary>Which health result should I trust?</summary>
         <div class="detail-body">
-          <p>API health can return HTTP 200 while degraded. Check its response and model reachability. MCP listener health only proves a listening process; authenticated discovery is a separate check.</p>
+          <p>API health can return HTTP 200 while degraded. Check its response and model reachability. <code>mode=archive_only</code> with <code>vllm=disabled</code> is a healthy archive-only stack, not an outage: OCR is off by design and <code>ocr_enabled=false</code> says so. MCP listener health only proves a listening process; authenticated discovery is a separate check.</p>
         </div>
       </details>
       <details id="help-architecture-ocr">

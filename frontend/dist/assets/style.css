@@ -1146,6 +1146,7 @@ input[type="range"]:disabled::-moz-range-thumb { background: var(--muted); box-s
 
 .metric-value.up { color: var(--blue); }
 .metric-value.down { color: var(--red); }
+.metric-value.muted { color: var(--muted); }
 
 /* ── Tables ──────────────────────────────────────────────────── */
 

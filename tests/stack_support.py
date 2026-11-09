@@ -60,9 +60,17 @@ for stub_argument in "$@"; do
         exit 0
     fi
 done
+stub_overlay=""
+for stub_argument in "$@"; do
+    case "$stub_argument" in
+        *compose.archive-only.yml) stub_overlay=1 ;;
+    esac
+done
 for stub_argument in "$@"; do
     if [ "$stub_argument" = "json" ]; then
-        if [ -n "${STACK_STUB_CONFIG_FILE:-}" ]; then
+        if [ -n "$stub_overlay" ] && [ -n "${STACK_STUB_ARCHIVE_CONFIG_FILE:-}" ]; then
+            cat "$STACK_STUB_ARCHIVE_CONFIG_FILE"
+        elif [ -n "${STACK_STUB_CONFIG_FILE:-}" ]; then
             cat "$STACK_STUB_CONFIG_FILE"
         else
             printf '%s\n' '{"services":{}}'
@@ -99,6 +107,11 @@ if not errorlevel 1 (
 )
 echo %* | findstr /C:"json" >nul
 if not errorlevel 1 (
+    echo %* | findstr /C:"compose.archive-only.yml" >nul
+    if not errorlevel 1 if defined STACK_STUB_ARCHIVE_CONFIG_FILE (
+        type "%STACK_STUB_ARCHIVE_CONFIG_FILE%"
+        exit /b %STACK_STUB_CONFIG_EXIT%
+    )
     if defined STACK_STUB_CONFIG_FILE (
         type "%STACK_STUB_CONFIG_FILE%"
     ) else (
@@ -221,10 +234,29 @@ for _name, _port in (("ocr-api", 8020), ("ocr-mcp", 8021), ("vllm-paddleocr", 80
         "cap_drop": ["ALL"],
         "security_opt": ["no-new-privileges:true"],
     }
+# What compose.archive-only.yml resolves to: no model server, and the API
+# with neither a vLLM dependency nor a GPU reservation.
+CANNED_ARCHIVE_CONFIG = {
+    "services": {
+        name: dict(service)
+        for name, service in CANNED_CONFIG["services"].items()
+        if name != "vllm-paddleocr"
+    }
+}
 CANNED_ENVIRONMENT = (
     "OCR_SERVER_API_TOKENS=fake-api-secret:console\n"
     "UPSTREAM_CLIENT_TOKEN=fake-service-secret\n"
     "MCP_API_TOKENS=fake-mcp-secret:agent\n"
+)
+# Appended by tests that start in archive-only mode: the planner refuses the
+# mode without the storage writer and browser roles.
+CANNED_ARCHIVE_ENVIRONMENT = (
+    "OCR_STORAGE_ENABLED=true\n"
+    "OCR_STORAGE_BROWSER_ENABLED=true\n"
+    "OCR_S3_ACCESS_KEY=fake-writer-key\n"
+    "OCR_S3_SECRET_KEY=fake-writer-secret\n"
+    "OCR_S3_BROWSER_ACCESS_KEY=fake-browser-key\n"
+    "OCR_S3_BROWSER_SECRET_KEY=fake-browser-secret\n"
 )
 
 
@@ -242,9 +274,12 @@ def write_stub_answers(
     env_file.write_text(CANNED_ENVIRONMENT, encoding="utf-8")
     config_file = directory / "config.json"
     config_file.write_text(json.dumps(CANNED_CONFIG), encoding="utf-8")
+    archive_file = directory / "archive-config.json"
+    archive_file.write_text(json.dumps(CANNED_ARCHIVE_CONFIG), encoding="utf-8")
     return {
         "STACK_STUB_ENVIRONMENT_FILE": str(env_file),
         "STACK_STUB_CONFIG_FILE": str(config_file),
+        "STACK_STUB_ARCHIVE_CONFIG_FILE": str(archive_file),
     }
 
 
@@ -280,6 +315,7 @@ def _stub_environment(
         "STACK_STUB_FAIL_CODE",
         "STACK_STUB_CONTROLS_LOG",
         "STACK_STUB_CONFIG_FILE",
+        "STACK_STUB_ARCHIVE_CONFIG_FILE",
         "STACK_STUB_ENVIRONMENT_FILE",
     ):
         environment.pop(name, None)

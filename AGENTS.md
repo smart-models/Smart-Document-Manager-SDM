@@ -56,7 +56,7 @@ Client / Console ─────────────────────
 | `stack.ps1` / `stack.sh` | **At the repository root.** The supported cross-platform entry points to verify, build, start, inspect, and stop the stack. |
 | `requirements/` | Direct dependency manifests (`api.txt`, `test.txt`, `benchmark.txt`, `dev.txt`, `ci.txt`, `vllm-security.txt`), `security-constraints.txt`, `audit-triage.json`, `inventory.json`, and captured Linux image package inventories under `locks/`. [`requirements/README.md`](requirements/README.md) is its reference. |
 | `.github/` | Three workflows (`workflows/ci.yml`, `workflows/dependency-audit.yml`, `workflows/release-check.yml`), `dependabot.yml`, [`.github/AGENTS.md`](.github/AGENTS.md), and [`.github/RELEASE_CHECKLIST.md`](.github/RELEASE_CHECKLIST.md). |
-| `compose.yml` / `Dockerfile` / `Dockerfile.vllm` | Root Compose definition (`ocr-api`, `vllm-paddleocr`, `ocr-mcp`, plus optional `storage` profile services `seaweedfs`, `storage-gateway`, `storage-init`), multi-target `Dockerfile` (`ocr-api` and `ocr-mcp`), and the vLLM security image build (`Dockerfile.vllm`). |
+| `compose.yml` / `compose.archive-only.yml` / `Dockerfile` / `Dockerfile.vllm` | Root Compose definition (`ocr-api`, `vllm-paddleocr`, `ocr-mcp`, plus optional `storage` profile services `seaweedfs`, `storage-gateway`, `storage-init`), the archive-only overlay the launchers merge for `--archive-only` / `-ArchiveOnly` runs (no `vllm-paddleocr`, no GPU reservation, `OCR_ARCHIVE_ONLY=true`), multi-target `Dockerfile` (`ocr-api` and `ocr-mcp`), and the vLLM security image build (`Dockerfile.vllm`). |
 | `tests/` | Central offline pytest suite (~80 test files) covering API endpoints, chunking, autotune, calibration, storage, MCP tools/schemas/resources, skills, launchers, and CI/dependency contracts. |
 | `docs/` | **Gitignored working material** — untracked specs, PRDs, local verification artifacts and agent notes live there; never `git add -f` them, and do not assume the directory exists. `ocr-mcp-server/ocr_mcp/resources/docs/` is the one exception: it is **versioned** and ships inside the MCP package. |
 
@@ -136,6 +136,7 @@ configure tokens before any `up`.
 pwsh stack.ps1 verify               # check tokens, storage and Compose security; touch no Docker state
 pwsh stack.ps1 up                   # verify, build, start in readiness order and print URLs
 pwsh stack.ps1 up -NoMcp -DryRun    # print the planned steps without MCP, run nothing
+pwsh stack.ps1 up -ArchiveOnly      # read stored archives: no vLLM, no GPU, OCR routes disabled
 pwsh stack.ps1 down
 pwsh stack.ps1 help                 # the authoritative command surface
 ```
@@ -143,6 +144,7 @@ pwsh stack.ps1 help                 # the authoritative command surface
 ```bash
 bash stack.sh verify
 bash stack.sh up --wait
+bash stack.sh up --archive-only
 bash stack.sh down
 bash stack.sh help
 ```
@@ -267,6 +269,17 @@ setting a non-zero exit code; assert that its output list is empty.
   `/openapi.json` are unauthenticated when `OCR_SERVER_API_TOKENS` is set.
   `/stats`, `/metrics` and `/parse/progress/{id}` require the bearer token
   whenever API authentication is enabled.
+- **Archive-only mode (`OCR_ARCHIVE_ONLY`, `compose.archive-only.yml`):**
+  the launchers' `--archive-only` / `-ArchiveOnly` merges the overlay, which
+  parks `vllm-paddleocr`, strips the API's vLLM dependency and GPU reservation
+  and sets `OCR_ARCHIVE_ONLY=true`. `Settings` accepts it only with both storage
+  roles; the middleware answers `503 ocr_disabled_archive_only` on `POST
+  /parse`, `/ocr` and `/parse/chunks` before reading the body; the vLLM poll
+  and startup calibration never run; `/health` reports `mode=archive_only`,
+  `vllm=disabled`, `ocr_enabled=false` and is `healthy` once the archive
+  bucket probe succeeds; MCP inference tools
+  refuse at the preflight without a POST (`tests/test_archive_only.py`,
+  `tests/test_mcp_archive_only.py`).
 - **Document vs element pipelines:** `/parse` and `/parse/chunks` run the
   PP-DocLayoutV3 + PaddleOCR-VL document pipeline (`pipeline_backend.py`) with
   bounded queue admission (`MAX_QUEUE_SIZE`) and PDF rasterization limits
@@ -399,7 +412,7 @@ the change crosses a boundary:
 | MCP tool, input schema, guardrail, resource, or prompt | `pytest tests/test_mcp_*.py tests/test_smart_document_reader_skill.py -q`, `python scripts/verify_mcp_wheel.py`, and update/re-copy `ocr-skill/` docs if affected. |
 | Any of the ten [copied documents](#copied-documents) | Re-copy into `ocr-mcp-server/ocr_mcp/resources/docs/` in the same commit, then `pytest tests/test_mcp_server.py guide/tests -q`. |
 | `.env.example` or `guide/*.html` | Update `guide/environment.html` (and its MCP copy) if assignments changed; run `pytest guide/tests tests/test_mcp_server.py -q` and `npx playwright test --config playwright.guides.config.js` in `frontend/`. |
-| Launcher (`stack.ps1`, `stack.sh`, `scripts/stack_core.py`), Compose, or security verifiers | `pytest tests/test_stack_core.py tests/test_stack_launchers.py tests/test_stack_verifiers.py -q`, `shellcheck stack.sh`, `Invoke-ScriptAnalyzer -Path stack.ps1 -Severity Warning,Error`, and both Compose config checks. |
+| Launcher (`stack.ps1`, `stack.sh`, `scripts/stack_core.py`), Compose (`compose.yml`, `compose.archive-only.yml`), or security verifiers | `pytest tests/test_stack_core.py tests/test_stack_launchers.py tests/test_stack_verifiers.py -q`, `shellcheck stack.sh`, `Invoke-ScriptAnalyzer -Path stack.ps1 -Severity Warning,Error`, and both Compose config checks. |
 | `Dockerfile`, `Dockerfile.vllm`, `requirements/*`, or `.github/workflows/*` | `pytest tests/test_dependency_inventory.py tests/test_security_constraints.py tests/test_verify_dependencies.py tests/test_ci_workflow.py tests/test_release_evidence.py -q`, `python -m scripts.verify_dependency_inventory`, `python scripts/security_constraints.py`, and `docker build --check`. |
 | Frontend console (`frontend/dist/` or `frontend/tests/`) | `python scripts/verify_frontend_assets.py`, `npm test`, and `npm run test:e2e` inside `frontend/`. |
 

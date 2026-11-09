@@ -177,7 +177,9 @@ def register(mcp: MCPServer, ctx: ToolContext) -> None:
 
         Error Handling:
             Refuses missing/multiple sources, invalid base64, oversized input
-            and disallowed paths before HTTP. Degraded health prevents POST.
+            and disallowed paths before HTTP. Degraded health prevents POST;
+            an archive-only API (mode='archive_only') is refused without a
+            POST and without a retry hint, since OCR is off by design.
             400/422: correct input/options; 413: reduce size; 401: fix upstream
             token; 429/503: inspect health/capacity and wait. 504/timeout may
             leave work running. No POST is automatically retried. Errors carry
@@ -272,8 +274,9 @@ def register(mcp: MCPServer, ctx: ToolContext) -> None:
         Error Handling:
             Exactly one source is required. PDF bytes, invalid base64, input
             over MCP_MAX_FILE_BYTES and paths outside MCP_INPUT_ROOTS are
-            refused before HTTP. Degraded health prevents POST. 400/422 require
-            corrected inputs; 413 smaller input; 401 an upstream token fix;
+            refused before HTTP. Degraded health prevents POST; an archive-only
+            API is refused without a POST, since OCR is off by design. 400/422
+            require corrected inputs; 413 smaller input; 401 an upstream token fix;
             429/503 a capacity/health check; timeout requires a deliberate retry.
             Returns is_error=true and structured {}. No automatic POST retry.
         """

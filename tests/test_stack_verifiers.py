@@ -164,3 +164,51 @@ def test_unexpected_missing_or_duplicate_publications_rejected():
         else:
             ports.append(deepcopy(ports[0]))
         assert validate_compose(config)
+
+
+def archive_only_compose(storage=False):
+    """Return the hardened archive-only shape: no model server anywhere."""
+    config = compose(storage)
+    del config["services"]["vllm-paddleocr"]
+    return config
+
+
+@pytest.mark.parametrize("storage", [False, True])
+def test_archive_only_shape_is_accepted_only_without_vllm_or_gpu(storage):
+    assert validate_compose(archive_only_compose(storage), archive_only=True) == []
+    # The standard shape is not an archive-only shape, and vice versa.
+    assert validate_compose(compose(storage), archive_only=True)
+    assert validate_compose(archive_only_compose(storage))
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"depends_on": {"vllm-paddleocr": {"condition": "service_healthy"}}},
+        {
+            "deploy": {
+                "resources": {
+                    "reservations": {
+                        "devices": [{"driver": "nvidia", "capabilities": ["gpu"]}]
+                    }
+                }
+            }
+        },
+    ],
+)
+def test_archive_only_rejects_a_leaked_vllm_dependency_or_gpu_reservation(change):
+    config = archive_only_compose()
+    config["services"]["ocr-api"].update(change)
+    assert validate_compose(config, archive_only=True)
+
+
+def test_archive_only_rejects_a_gpu_reservation_on_any_service():
+    config = archive_only_compose(True)
+    config["services"]["ocr-mcp"]["deploy"] = {
+        "resources": {"reservations": {"devices": [{"driver": "nvidia"}]}}
+    }
+    assert validate_compose(config, archive_only=True)
+    # Hardening is not relaxed in archive-only mode.
+    config = archive_only_compose()
+    config["services"]["ocr-api"]["read_only"] = False
+    assert validate_compose(config, archive_only=True)

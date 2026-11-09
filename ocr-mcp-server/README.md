@@ -21,7 +21,9 @@ calls cross the HTTP boundary; the package runs independently of `ocrserver`.
    authenticates its HTTP requests to the OCR API.
 2. Every tool takes one `params` object. Structured content is preserved across
    Markdown and JSON presentations, with bounded text summaries for RAG creation.
-3. Inference checks health first. Storage and Office preview do not need a model.
+3. Inference checks health first; an archive-only API (`mode=archive_only`) is
+   refused there without a POST. Storage, RAG refinement, chunking of existing
+   parse JSON and Office preview do not need a model.
 4. Destructive tools check exact confirmation locally before HTTP; the API checks
    it independently. An HTTP timeout never establishes that work stopped.
 
@@ -174,6 +176,18 @@ previews Office documents as base64 PDF when the result fits the configured
 byte limit. `ocr_check_health` adds an `mcp` object: this server's
 `input_roots`, `max_file_bytes` and `max_request_body_bytes`.
 
+When the OCR API runs in archive-only mode (`stack.* up --archive-only` /
+`-ArchiveOnly`: no `vllm-paddleocr`, no GPU), `/health` reports
+`status=healthy`, `mode=archive_only`, `vllm=disabled` and `ocr_enabled=false`;
+`ocr_check_health` forwards those fields and older APIs without them validate
+as `mode=ocr`. `ocr_parse_document`, `ocr_recognize_image` and the document
+mode of `ocr_create_rag_chunks` stop at the preflight with an error that names
+the mode, makes no POST and suggests no retry. `ocr_get_stats`, every storage
+tool, `ocr_refine_rag_storage`, `ocr_split_rag_group`, the `parsed_document`
+mode of `ocr_create_rag_chunks` and `ocr_convert_office_to_pdf` work
+unchanged, and the deletion tools keep their confirmation gates. A direct
+`503 ocr_disabled_archive_only` from the API is explained the same way.
+
 Logs carry labels and outcomes, never values: the accepted token labels at
 startup, `token verified: <label>` per authenticated HTTP request, and one
 `tool '<name>' ok|error <seconds>s` line per tool call, never its arguments.
@@ -186,7 +200,9 @@ browse and download archives, explicitly delete artifacts, refine saved RAG
 plans, preview splits and convert Office files to preview PDFs.
 
 **You cannot:** use an unmounted client-local path, cancel a submitted inference,
-assume a timeout stopped it, or receive partial binary bytes above a size cap.
+assume a timeout stopped it, run OCR against an archive-only API (the refusal
+names the mode and nothing to wait for), or receive partial binary bytes above
+a size cap.
 Storage/Office caps count raw bytes; the RAG creation cap counts the whole
 serialized tool result. JSON response validation preserves valid extra fields.
 
@@ -360,7 +376,7 @@ From the repository root, in an environment with its lightweight API test
 dependencies (`requirements/test.txt`):
 
 ```sh
-python -m pytest tests/test_mcp_coverage.py tests/test_mcp_tools.py tests/test_mcp_schema.py tests/test_mcp_server.py tests/test_mcp_client.py
+python -m pytest tests/test_mcp_coverage.py tests/test_mcp_tools.py tests/test_mcp_schema.py tests/test_mcp_server.py tests/test_mcp_client.py tests/test_mcp_archive_only.py
 docker compose config --quiet
 ```
 
@@ -379,6 +395,7 @@ Live OCR quality must be assessed using representative documents.
 | Tool reports an invalid upstream payload | Check the API version; rejected content is not echoed |
 | Confirmation is refused | Copy the exact job ID or relative artifact name from storage details |
 | Binary download exceeds the cap | Use the named REST route; do not raise limits blindly |
+| Inference tool reports archive-only mode | The API runs without vLLM by the operator's choice; use the storage tools. OCR comes back when an operator starts the stack in OCR mode: no `--archive-only` / `-ArchiveOnly` flag and `OCR_ARCHIVE_ONLY` unset or false in `.env` |
 
 ## Invariants
 

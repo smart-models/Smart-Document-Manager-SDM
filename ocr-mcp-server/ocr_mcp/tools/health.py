@@ -27,10 +27,30 @@ def local_limits(settings: Settings) -> dict:
     }
 
 
+ARCHIVE_ONLY_REFUSAL = (
+    "OCR inference is disabled: the OCR API runs in archive-only mode, with "
+    "no vLLM model server and no GPU. Parsing and recognition are unavailable "
+    "by the operator's choice, not because of an outage, so waiting changes "
+    "nothing; stored archives, RAG refinement, chunking of existing parse JSON "
+    "and Office previews still work. OCR comes back only when an operator "
+    "starts the stack in OCR mode: no -ArchiveOnly / --archive-only flag, and "
+    "OCR_ARCHIVE_ONLY unset or false in its environment."
+)
+
+
+def archive_only(health: dict) -> bool:
+    """Report whether a validated /health payload comes from an archive-only API."""
+    return health.get("mode") == "archive_only" or health.get("ocr_enabled") is False
+
+
 async def require_healthy(ctx: ToolContext) -> None:
     """Use the console's readiness rule before starting expensive inference."""
     health = await ctx.client.request("GET", "/health")
     validate_payload(health, "/health")
+    if archive_only(health):
+        # Checked before the status: an archive-only API is healthy and still
+        # refuses OCR, and the fix is a different launch, not patience.
+        raise ToolError(ARCHIVE_ONLY_REFUSAL)
     if health.get("status") != "healthy":
         raise ToolError(
             "OCR backend unavailable — parsing and recognition are paused "
@@ -56,19 +76,23 @@ def register(mcp: MCPServer, ctx: ToolContext) -> None:
         """Check OCR API health and inference readiness without running OCR.
 
         Reads the current vLLM poll and autotune summary. HTTP 200 can report
-        degraded; only status='healthy' permits inference. This does not load
-        models or test document recognition quality.
+        degraded; only status='healthy' with ocr_enabled=true permits
+        inference. mode='archive_only' (vllm='disabled') is a healthy server
+        that serves stored archives only: the inference tools refuse before
+        any POST, while storage, RAG and Office tools work. This does not
+        load models or test document recognition quality.
 
         Args:
             params (CheckHealthInput): response_format ('markdown' or 'json').
 
         Returns:
             Markdown verdict plus identical structured content, or JSON:
-            {"status": str, "vllm": str, "model": str,
-             "pipeline_version": str, "version": str, "autotune": dict,
-             "storage": dict, "mcp": {"input_roots": [str],
+            {"status": str, "mode": str, "vllm": str, "ocr_enabled": bool,
+             "model": str, "pipeline_version": str, "version": str,
+             "autotune": dict, "storage": dict, "mcp": {"input_roots": [str],
              "max_file_bytes": int, "max_request_body_bytes": int}}
-            status is healthy/degraded; vllm is reachable/unreachable.
+            status is healthy/degraded; mode is ocr/archive_only; vllm is
+            reachable/unreachable, or disabled in archive-only mode.
             autotune always has action and may have decisions, mode, objective.
             storage reports the archive backend when the API has one. mcp is
             this MCP server: file_path must sit inside one of input_roots (an

@@ -18,7 +18,7 @@ from ocrserver.autotune.fingerprint import build_fingerprint
 from ocrserver.autotune.gates import cer
 from ocrserver.autotune.profile import AutotuneConfig
 from ocrserver.autotune.runner import MeasurementIsolationError, run as run_autotune
-from ocrserver.autotune.tiers import detect_gpu
+from ocrserver.autotune.tiers import _env_bool, detect_gpu
 from ocrserver.config import Settings, load_settings
 
 logger = logging.getLogger(__name__)
@@ -319,10 +319,17 @@ def prepare(env: Mapping[str, str] | None = None) -> dict:
     Return the startup action report without launching the API server.
     """
     values = os.environ if env is None else env
-    config = AutotuneConfig.from_env(values)
-    if config.mode == "off":
+    if _env_bool(values, "OCR_ARCHIVE_ONLY"):
+        # Archive-only serves stored archives: no GPU detection, no vLLM
+        # probe, no model load and no calibration pass may run.
+        result = {
+            "action": "disabled",
+            "reason": "archive-only mode: OCR inference is disabled",
+        }
+    elif AutotuneConfig.from_env(values).mode == "off":
         result = {"action": "disabled", "reason": "autotune is off"}
     else:
+        config = AutotuneConfig.from_env(values)
         gpu = detect_gpu()
         # Keep the fingerprint clean: the digest is stored separately by
         # make_profile. Injecting it into the dict makes the saved fingerprint

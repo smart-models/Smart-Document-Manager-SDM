@@ -16,8 +16,7 @@ description: >
 # Operating Personal Smart OCR
 
 This skill governs every `smart-document-mcp` call, a health check as much as a
-parse, from the first call of a task: the schemas give the arguments, these rules
-the practice. Every tool takes one `params` object; `response_format` only changes
+parse: the schemas give the arguments, these rules the practice. Every tool takes one `params` object; `response_format` only changes
 presentation, never the structured result:
 
 ```json
@@ -93,8 +92,9 @@ asking again.
 ## Spend inference once
 
 - Call `smart-document-mcp:ocr_check_health` before the first inference: only `status="healthy"`
-  allows it, and HTTP 200 can still say `degraded`. Storage reads, split, refine and
-  Office previews need no model health.
+  with `ocr_enabled=true` allows it, and HTTP 200 can still say `degraded`;
+  `mode="archive_only"` means OCR is off by design: read archives. Storage
+  reads, split, refine and Office previews need no model health.
 - Parse once, with the parameters the user approved.
 - Set `max_pages` only for a sample the user asked for, or a document longer than
   about 20 pages. It always reads from page 1, so a second run repeats
@@ -116,7 +116,7 @@ asking again.
 ## RAG chunks and stored refinement
 
 - Create chunks only when asked, with a budget the user confirmed (propose
-  `options.max_tokens=512`), never one picked silently. Prefer an archived parse by
+  `options.max_tokens=512`). Prefer an archived parse by
   `source_key` (its `json_ocr.json` key; the MCP fetches it) and `parsed_document`
   only for a result you hold intact: neither needs inference. In
   document mode, a document longer than `OCR_MAX_PAGES` is refused unless

@@ -81,6 +81,16 @@ Client / Console / MCP ──► ocr_server.py + ocrserver/ (FastAPI, :8020) ─
    is enabled, the pipeline writes archives using `OCR_S3_ACCESS_KEY` (`writer`),
    while `/storage/*` browser routes use `OCR_S3_BROWSER_ACCESS_KEY` (`browser`).
    The provisioning `admin` key is never passed to `ocr-api`.
+7. **Archive-only mode is a settings decision, not a degraded state.**
+   `OCR_ARCHIVE_ONLY=true` (set by `compose.archive-only.yml` when the launchers
+   run with `--archive-only` / `-ArchiveOnly` or with that variable true in
+   `.env`) requires both storage roles. The
+   middleware refuses `POST /parse`, `/ocr` and `/parse/chunks` with
+   `503 ocr_disabled_archive_only` before reading the body, the lifespan never
+   starts the vLLM poll, `autotune_entrypoint.py` runs no GPU detection or
+   calibration, and `/health` reports `mode=archive_only`, `vllm=disabled` and
+   `ocr_enabled=false`, `healthy` only once the archive bucket probe has
+   succeeded (`degraded` before the first probe and whenever it fails).
 
 ## Map of the code
 
@@ -107,7 +117,7 @@ Client / Console / MCP ──► ocr_server.py + ocrserver/ (FastAPI, :8020) ─
 
 | Method & Path | Auth required? | Purpose |
 |---|---|---|
-| `GET /health` | No | Liveness and upstream `vllm-paddleocr` reachability (`healthy` vs `degraded`), active autotune profile, and storage status |
+| `GET /health` | No | Liveness, `mode` (`ocr` or `archive_only`), upstream `vllm-paddleocr` reachability (`reachable`, `unreachable`, or `disabled` in archive-only mode), `ocr_enabled`, active autotune profile, and storage status |
 | `GET /stats` | Yes (when token set) | Queue depths, active requests, circuit-breaker state, and cumulative counters |
 | `GET /metrics` | Yes (when token set) | Prometheus text metrics (`ocr://metrics` in MCP) |
 | `POST /parse` | Yes (when token set) | Parse a PDF, image, or Office document (multipart upload or JSON base64) into structured pages, blocks, Markdown, and optional `json_rag` |
@@ -154,6 +164,8 @@ descriptions live in [`.env.example`](../.env.example) and
 - **S3 storage (`OCR_STORAGE_*`, `OCR_S3_*`)**: `OCR_STORAGE_ENABLED`,
   `OCR_STORAGE_BROWSER_ENABLED`, `OCR_S3_ENDPOINT`, `OCR_S3_BUCKET`, writer and
   browser credentials.
+- **Archive-only (`OCR_ARCHIVE_ONLY`)**: `false`; `true` is accepted only with
+  both storage roles enabled and is normally set by `compose.archive-only.yml`.
 
 ## Behaviour contracts
 
@@ -189,6 +201,24 @@ descriptions live in [`.env.example`](../.env.example) and
 - **Storage archival is non-blocking to OCR responses when disabled, and
   explicitly reported via `X-OCR-Storage-*` headers and `storage` metadata when
   enabled.**
+- **Archive-only mode refuses inference explicitly and early.** With
+  `OCR_ARCHIVE_ONLY=true`, `POST /parse`, `/ocr` and `/parse/chunks` return
+  `503` with
+  `{"detail": {"code": "ocr_disabled_archive_only", "message": "OCR inference is disabled in archive-only mode."}}`
+  from the middleware, after authentication and before the body is read, so no
+  rasterization, Office conversion, admission slot, PaddleOCR/VL initialization
+  or vLLM call happens; `ocr_requests_rejected_total{reason="archive_only"}`
+  increments and the gauge `ocr_archive_only_mode` reads `1` (so `ocr_vllm_up`
+  staying `0` is not an outage); `autotune` reports `action: "disabled"` with
+  the reason `archive-only mode: OCR inference is disabled`. `/health` answers
+  `{"status": "healthy", "mode": "archive_only", "vllm": "disabled", "ocr_enabled": false, ...}`
+  only while the archive bucket probe reports `ok`, and `degraded` before the
+  first probe answers or when it reports `error`, so the Docker healthcheck
+  never releases MCP onto an unverified bucket; in OCR mode the same response
+  carries `mode: "ocr"` and `ocr_enabled: true` with
+  the unchanged `reachable`/`unreachable` vocabulary. `/chunk` (with the
+  mounted tokenizer cache), `/office/pdf`, `/storage/*`, `/stats` and `/metrics`
+  keep working; the Docker healthcheck accepts the mode as healthy.
 - **Whole-archive deletion unindexes best effort.** Once every object is gone the
   API removes the archive's index entry and ignores a failure: a leftover entry
   only costs listings one manifest read until the next `stack.* up` prunes it. A
@@ -201,7 +231,7 @@ layout-ordered blocks, HTML/Markdown tables, LaTeX formulas, charts, seals, and
 2D text spotting coordinates; chunk documents for RAG with mathematical token
 bounds and provenance; and archive outputs to S3.
 
-**You cannot:** run `ocr-api` without an NVIDIA GPU (layout analysis uses
+**You cannot:** run `ocr-api` in OCR mode without an NVIDIA GPU (layout analysis uses
 `paddlepaddle-gpu` 3.2.1 built for CUDA 12.6, which cannot import without
 `libcuda`; verified on compute capability 8.9 — CUDA 12.6 has no Blackwell
 `sm_120` target, so RTX 50-series cards need a newer Paddle build), run layout
@@ -209,7 +239,9 @@ on a different GPU from vLLM (both reserve the one `OCR_GPU_DEVICE` card), share
 card under 8 GB with vLLM at the default `OCR_LAYOUT_GPU_MEMORY_MB`, restart
 `vllm-paddleocr` alone on an 8 GB card while `ocr-api` holds layout VRAM, run
 `/parse` or `/ocr` without a reachable `vllm-paddleocr`
-backend, process multi-frame TIFF/GIF animations on `/ocr`, exceed configured
+backend, run `/parse`, `/ocr` or `/parse/chunks` in archive-only mode (they
+answer `503 ocr_disabled_archive_only`; that mode starts without any GPU because
+Paddle loads only on the first inference, which it never admits), process multi-frame TIFF/GIF animations on `/ocr`, exceed configured
 pixel/byte/page budgets without receiving `413`/`422`, or mutate S3 archives
 without the browser role enabled and exact `confirm` strings.
 
@@ -225,6 +257,12 @@ python -m compileall ocr_server.py autotune_entrypoint.py ocrserver vllm calibra
 
 ```powershell
 python -m pytest tests/test_api_config.py tests/test_chunk_contract.py tests/test_storage.py -q
+```
+
+**Check the archive-only contract (API and MCP) without a GPU:**
+
+```powershell
+python -m pytest tests/test_archive_only.py tests/test_mcp_archive_only.py -q
 ```
 
 ## Verification
@@ -245,7 +283,8 @@ always include `tests/test_mcp_coverage.py` and `tests/test_mcp_schema.py`.
 
 | Symptom | Next check |
 |---|---|
-| `/health` returns HTTP 200 with `"status": "degraded"` | `vllm-paddleocr` is unreachable or circuit breaker is open; inspect `vllm-paddleocr` container logs and `OCR_VLLM_URL` |
+| `/health` returns HTTP 200 with `"status": "degraded"` | `vllm-paddleocr` is unreachable or circuit breaker is open; inspect `vllm-paddleocr` container logs and `OCR_VLLM_URL`. In archive-only mode it means the archive bucket probe has not succeeded yet, or failed: check the storage services |
+| `/health` returns `"mode": "archive_only"` with `"vllm": "disabled"` | Deliberate: the stack was started with `--archive-only` / `-ArchiveOnly` or `OCR_ARCHIVE_ONLY=true`; stored archives are readable and OCR routes answer `503 ocr_disabled_archive_only` until the stack is started in OCR mode again (no flag, and `OCR_ARCHIVE_ONLY` unset or false in `.env`) |
 | `413 Payload Too Large` on `/parse` or `/ocr` | Check `MAX_FILE_BYTES`, `OCR_MAX_PAGES`, `OCR_PDF_MAX_PAGE_PIXELS`, or `OCR_ELEMENT_MEMORY_BYTES` |
 | `422 Unprocessable Entity` on `/chunk` | Inspect the structured chunking error code (e.g. missing `options.max_tokens` or strict protected-unit overflow) |
 | `503 Service Unavailable` under load | Admission queue (`OCR_MAX_QUEUE_SIZE` or `OCR_ELEMENT_MAX_SLOTS`) is full, or `ChunkRuntime` worker queue timed out |

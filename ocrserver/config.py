@@ -100,6 +100,10 @@ class Settings:
     office_timeout_seconds: float = 120.0
     storage_enabled: bool = False
     storage_browser_enabled: bool = False
+    # Archive-only: serve stored archives with no vLLM and no GPU. The
+    # inference routes answer 503 ocr_disabled_archive_only (ocr_server.py);
+    # the launchers set it through compose.archive-only.yml.
+    archive_only: bool = False
     s3_browser_access_key: str = field(default="", repr=False)
     s3_browser_secret_key: str = field(default="", repr=False)
     s3_endpoint: str = "http://seaweedfs:8333"
@@ -198,6 +202,7 @@ class Settings:
             "storage_save_input",
             "storage_save_parsed",
             "storage_browser_enabled",
+            "archive_only",
         ):
             if type(getattr(self, name)) is not bool:
                 raise ValueError(f"{name} must be a boolean")
@@ -255,6 +260,15 @@ class Settings:
             self.s3_browser_access_key.strip() and self.s3_browser_secret_key.strip()
         ):
             raise ValueError("enabled storage browser requires explicit credentials")
+        # Without the archive writer and the browser role there is nothing an
+        # archive-only server could serve; refuse to start rather than run empty.
+        if self.archive_only and not (
+            self.storage_enabled and self.storage_browser_enabled
+        ):
+            raise ValueError(
+                "archive-only mode requires OCR_STORAGE_ENABLED and "
+                "OCR_STORAGE_BROWSER_ENABLED"
+            )
         if not self.s3_region.strip():
             raise ValueError("s3_region must be nonempty")
         if self.s3_addressing_style not in ("path", "virtual"):
@@ -341,6 +355,7 @@ _ENV_KEYS = {
     "office_timeout_seconds": "OCR_OFFICE_TIMEOUT_SECONDS",
     "storage_enabled": "OCR_STORAGE_ENABLED",
     "storage_browser_enabled": "OCR_STORAGE_BROWSER_ENABLED",
+    "archive_only": "OCR_ARCHIVE_ONLY",
     "s3_browser_access_key": "OCR_S3_BROWSER_ACCESS_KEY",
     "s3_browser_secret_key": "OCR_S3_BROWSER_SECRET_KEY",
     "s3_endpoint": "OCR_S3_ENDPOINT",

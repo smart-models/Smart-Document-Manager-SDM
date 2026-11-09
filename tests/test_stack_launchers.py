@@ -55,6 +55,8 @@ def test_verify_does_not_need_daemon_and_never_sends_tokens_on_argv(launcher, st
         ["up", "--wait-timeout", "0"],
         ["up", "--gpu-device", "x"],
         ["build", "--gpu-device", "1"],
+        ["up", "--archive-only", "--gpu-device", "1"],
+        ["status", "--archive-only"],
         ["bogus"],
     ],
 )
@@ -244,3 +246,83 @@ def test_unreachable_daemon_fails_status_with_human_message(launcher, stub):
     result = launcher(["status"], **stub)
     assert result.returncode == 1
     assert "Docker daemon not reachable" in result.stderr
+
+
+def archive_only_stub(stub):
+    """Give the stub env the storage roles archive-only mode insists on."""
+    env_file = Path(stub["env"]["STACK_STUB_ENVIRONMENT_FILE"])
+    env_file.write_text(
+        env_file.read_text(encoding="utf-8") + support.CANNED_ARCHIVE_ENVIRONMENT,
+        encoding="utf-8",
+    )
+    return stub
+
+
+def test_archive_only_up_verifies_both_shapes_and_never_starts_vllm(launcher, stub):
+    result = launcher(["up", "--archive-only", "--no-build"], **archive_only_stub(stub))
+    assert result.returncode == 0, result.stderr
+    # The verifier resolves four shapes itself; on Windows its subprocess may
+    # reach the real Docker rather than the stub, so its own report is the proof.
+    assert (
+        "Compose security: OK (base, storage and archive-only shapes" in result.stdout
+    )
+    starts = [line for line in result.invocations if " up " in f" {line} "]
+    assert starts and all("compose.archive-only.yml" in line for line in starts)
+    assert not any("vllm-paddleocr" in line for line in starts)
+    assert any(
+        "rm --stop --force vllm-paddleocr" in line for line in result.invocations
+    )
+    assert "archive-only" in result.stdout and "8081" not in result.stdout
+
+
+def test_archive_only_refuses_without_storage_before_any_mutation(launcher, stub):
+    result = launcher(["up", "--archive-only"], **stub)
+    assert result.returncode == 2, result.stderr
+    assert "OCR_STORAGE_BROWSER_ENABLED" in result.stderr
+    assert not any(
+        any(f" {verb} " in f" {line} " for verb in ("up", "build", "rm"))
+        for line in result.invocations
+    )
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        ["up", "--archive-only", "--dry-run"],
+        ["up", "--archive-only", "--no-mcp", "--dry-run"],
+        ["build", "--archive-only", "--dry-run"],
+        ["pull", "--archive-only", "--dry-run"],
+        ["restart", "--archive-only", "--dry-run"],
+        ["config", "--archive-only", "--dry-run"],
+        ["urls", "--archive-only"],
+    ],
+)
+def test_archive_only_shell_parity(arguments, stub):
+    if support.bash_executable() is None or support.powershell_executable() is None:
+        pytest.skip("Parity requires Bash and PowerShell")
+    archive_only_stub(stub)
+    bash = support.run_bash_launcher(arguments, **stub)
+    powershell = support.run_powershell_launcher(arguments, **stub)
+    assert bash.returncode == powershell.returncode == 0, (
+        bash.stderr,
+        powershell.stderr,
+    )
+
+    def normalized(lines):
+        return [
+            line.replace("\\", "/").replace('"', "").replace("/c/", "C:/").strip()
+            for line in lines
+        ]
+
+    assert normalized(bash.invocations) == normalized(powershell.invocations)
+    assert normalized(bash.stdout.splitlines()) == normalized(
+        powershell.stdout.splitlines()
+    )
+    # Planned argv lines are indented; vllm-paddleocr may appear only as the
+    # target of the one `rm --stop --force` step that frees the GPU on `up`.
+    argv = [line.strip() for line in bash.stdout.splitlines() if line.startswith("  ")]
+    assert argv.count("vllm-paddleocr") == (1 if arguments[0] == "up" else 0)
+    # `urls` plans no step; `pull` without the storage profile has nothing left
+    # to fetch once the vLLM image is out of the picture.
+    if arguments[0] not in {"urls", "pull"}:
+        assert "compose.archive-only.yml" in bash.stdout

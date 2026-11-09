@@ -231,16 +231,25 @@ result, `<stem>` being the archive folder's filename without its extension) but 
 
 ## Diagnostics and readiness
 
-`ocr_check_health` forwards `status` (healthy/degraded), `vllm`
-(reachable/unreachable), `model`, `pipeline_version`, `version`, `storage`
+`ocr_check_health` forwards `status` (healthy/degraded), `mode`
+(ocr/archive_only), `vllm` (reachable/unreachable, or disabled in archive-only
+mode), `ocr_enabled`, `model`, `pipeline_version`, `version`, `storage`
 (status, last operation, timestamp) and `autotune` (`action`, plus when present
 `decisions`, `mode`, `objective`, `reason`, `warmup_seconds`,
 `measured_candidates`, `effective`), plus `mcp`: this MCP server's
 `input_roots` (where `file_path` may point; empty means base64 only),
-`max_file_bytes` and `max_request_body_bytes`. Status comes from a periodic
-vLLM poll.
+`max_file_bytes` and `max_request_body_bytes`. In OCR mode status follows the
+periodic vLLM poll; in archive-only mode it follows the archive bucket probe
+(degraded until the first probe succeeds, or whenever it fails) and `autotune`
+reports `action="disabled"` with an archive-only reason.
 Both inference tools check it first and refuse the POST unless healthy, before
-the transfer and preprocessing; local source validation happens earlier.
+the transfer and preprocessing; local source validation happens earlier. An
+archive-only API (`mode="archive_only"`, `ocr_enabled=false`) is refused at the
+same preflight with a message naming the mode: no POST, nothing to wait for.
+The stack runs without vLLM and without a GPU because an operator started it
+with `--archive-only` / `-ArchiveOnly` or with `OCR_ARCHIVE_ONLY=true` in
+`.env`; OCR comes back only when it is started in OCR mode again (no flag, and
+that variable unset or false). Storage, RAG and Office tools are unaffected.
 
 `ocr_get_stats` returns floating-point gauges `queue_size` (acquired parse
 slots) and `active`; neither is a job list. `ocr://metrics` returns raw
@@ -436,6 +445,7 @@ this tool only to show or keep the rendered PDF.
 | 429 | Wait before another call |
 | 503 queue_full/slots_full/image_memory_full | Inspect ocr_get_stats and reduce concurrency |
 | 503 backend_unavailable/shutting_down, backend_error | Inspect ocr_check_health and wait |
+| 503 ocr_disabled_archive_only | Archive-only mode: read the stored archives; only an operator starting the stack in OCR mode (no --archive-only / -ArchiveOnly, OCR_ARCHIVE_ONLY unset or false) brings OCR back |
 | 500 internal_error | Report it; do not retry in a loop |
 | 500 chunk_worker_failed | Retry once deliberately, then ask the operator to check API logs |
 | 500 chunk_validation_failed | Ask the operator to check API logs; do not retry in a loop |

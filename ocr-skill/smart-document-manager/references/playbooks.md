@@ -32,7 +32,9 @@ are MCP calls (`name` plus `arguments`) with concrete values.
    `C:/ocr-inputs/` as such a root). On an "outside MCP_INPUT_ROOTS" refusal, ask
    for permission to copy the file into a root. Use base64 only for bytes a tool
    hands over intact, never retyped.
-2. Call `ocr_check_health`; stop while degraded.
+2. Call `ocr_check_health`; stop while degraded. `mode="archive_only"` means OCR
+   is off by design (no vLLM, no GPU): switch to the stored-document playbook
+   instead of waiting.
 3. Show the parse parameters with the values to be used (the SKILL.md table:
    `output`, `json_rag`, `table_format`, `max_pages`, `dpi`, `include_images`)
    and wait for a yes or changes; a request that fixed them, or asked for the
@@ -122,7 +124,9 @@ are MCP calls (`name` plus `arguments`) with concrete values.
 2. Call `ocr_check_health`, then `ocr_get_stats`. Read `ocr://metrics` only when
    counters are needed, and report them as snapshots.
 3. Act on the code: fix input for 400/422, ask an operator for 401/403, shrink
-   input for 413, wait for capacity or readiness for 429/503.
+   input for 413, wait for capacity or readiness for 429/503. A 503
+   `ocr_disabled_archive_only`, or `mode="archive_only"` in health, is not an
+   outage: read the archives instead.
 4. After a timeout, assume the work may still run; there is no job lookup or
    cancellation. Retry only as a deliberate decision, never in a loop.
 5. When only some pages failed, report the successful content and name the gaps.
