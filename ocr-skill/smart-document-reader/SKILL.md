@@ -1,7 +1,7 @@
 ---
 name: smart-document-reader
 description: >
-  Interprets the JSON returned by Personal Smart OCR /parse or ocr_parse_document
+  Interprets the JSON returned by Smart Document Manager /parse or ocr_parse_document
   (PaddleOCR-VL): reading order, sections, tables, captions, footnotes, formulas,
   code, seals, logos, page labels and provenance, and the files of its stored archive
   (`manifest.json`, `json_ocr.json`, `<stem>.md`, `document/<stem>_pNNNN.md`,

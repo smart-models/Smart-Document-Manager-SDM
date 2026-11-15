@@ -1,4 +1,4 @@
-# Personal Smart OCR tool reference
+# Smart Document Manager tool reference
 
 ## Contents
 

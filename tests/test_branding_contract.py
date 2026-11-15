@@ -137,3 +137,27 @@ def test_field_guides_use_current_product_branding():
         assert PRODUCT_NAME in text, page.name
         for legacy_name in LEGACY_DISPLAY_NAMES:
             assert legacy_name not in text, page.name
+
+
+def test_agent_skills_use_current_product_branding():
+    """Keep the legacy display name out of every skill document and eval.
+
+    The skills are what an agent reads before it touches the stack, and the
+    MCP package serves byte-for-byte copies of the manager skill and its
+    reference, so a stale name here reaches every client. The former skill
+    slug ``personal-smart-ocr`` stays allowed: ``ocr-skill/README.md`` names
+    it on purpose so an old installation can be found and removed.
+    """
+    documents = sorted(
+        path
+        for path in (REPOSITORY_ROOT / "ocr-skill").rglob("*")
+        if path.suffix in {".md", ".json", ".yaml", ".yml"}
+    )
+    assert documents, "No skill documents found"
+    for path in documents:
+        text = path.read_text(encoding="utf-8")
+        for legacy_name in LEGACY_DISPLAY_NAMES:
+            assert legacy_name not in text, path.relative_to(REPOSITORY_ROOT)
+    for skill in ("smart-document-manager", "smart-document-reader"):
+        skill_text = _read(f"ocr-skill/{skill}/SKILL.md")
+        assert PRODUCT_NAME in skill_text, skill

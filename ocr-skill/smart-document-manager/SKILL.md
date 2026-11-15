@@ -1,7 +1,7 @@
 ---
 name: smart-document-manager
 description: >
-  Drives Personal Smart OCR through its `smart-document-mcp` MCP tools and carries the
+  Drives Smart Document Manager through its `smart-document-mcp` MCP tools and carries the
   operating rules every call relies on: document parsing, element recognition,
   readiness and capacity checks, stored OCR archives, RAG chunking and refinement,
   and Office-to-PDF previews. Use when calling any `smart-document-mcp` tool (`ocr_*`)
@@ -13,7 +13,7 @@ description: >
   confirmation, returns partial data, or the tools are missing from the client.
 ---
 
-# Operating Personal Smart OCR
+# Operating Smart Document Manager
 
 This skill governs every `smart-document-mcp` call, a health check as much as a
 parse: the schemas give the arguments, these rules the practice. Every tool takes one `params` object; `response_format` only changes
