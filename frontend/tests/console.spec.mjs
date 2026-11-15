@@ -657,7 +657,7 @@ test("monitor shows unexpected refresh errors and resumes polling", async ({ pag
     api.stats = () => { api.stats = original; throw new Error("simulated unexpected failure"); };
   });
   await page.locator("#tab-monitor").click();
-  await expect(page.locator("#mon-table")).toContainText("Monitor refresh failed");
+  await expect(page.locator("#mon-table")).toContainText("Monitoring refresh failed");
   await expect(page.locator("#mon-reset")).toBeDisabled();
   await page.clock.fastForward(5000);
   await expect(page.locator("#mon-reset")).toBeEnabled();

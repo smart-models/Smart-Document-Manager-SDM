@@ -1,5 +1,5 @@
 // ── OCR Server console ──
-// One-page UI: Parse, OCR, Monitor. All API traffic goes through
+// One-page UI: Parse, OCR, RAG, Storage, Monitoring. All API traffic goes through
 // assets/api.js; all pure logic lives in assets/models.js.
 
 // Static assets are revalidated with Cache-Control: no-cache; legacy version
@@ -50,7 +50,7 @@ import { mountStorage } from "/assets/storage.js";
 import { mountRagStorage } from "/assets/rag-storage.js";
 import { mountRagSelection } from "/assets/rag-selection.js";
 
-// Monitor state persists across tab changes. In-flight work belongs to the
+// Monitoring state persists across tab changes. In-flight work belongs to the
 // active monitor session and is cancelled when leaving the tab.
 const SERIES_MAX = 120;
 let monitorTimer = null;
@@ -140,7 +140,7 @@ const ragStoragePanel = mountRagStorage(document.getElementById("rag-storage-roo
 
 // ── Health polling ────────────────────────────────────────────
 // False until the first healthy probe: the action panels stay locked while
-// the backend is degraded or unreachable (Monitor stays open on purpose —
+// the backend is degraded or unreachable (Monitoring stays open on purpose —
 // it is where the outage is diagnosed).
 let servicesReady = false;
 // True while /health reports mode "archive_only": OCR is off by design, so
@@ -151,7 +151,7 @@ let archiveOnly = false;
 let apiHealthy = false;
 
 // "ok", "missing" or "rejected" (see initApiKey). Anything but "ok" locks every
-// tab that calls a protected endpoint; Monitor stays open for diagnosis.
+// tab that calls a protected endpoint; Monitoring stays open for diagnosis.
 let authState = "ok";
 const AUTH_MESSAGES = {
   missing: "API KEY MISSING — OPEN API KEY AND REGISTER A KEY",
@@ -166,9 +166,9 @@ function renderServiceGate() {
   // are hidden, so nothing on screen is waiting for OCR.
   if (!servicesReady && !(archiveOnly && apiHealthy)) alerts.push(archiveOnly
     ? alertHtml("error",
-      "ARCHIVE-ONLY MODE, STORAGE UNREACHABLE — this server runs without vLLM, and /health reports its archive bucket as unavailable, so stored archives cannot be read until storage recovers. OCR stays disabled by the operator. See the Monitor tab for details.")
+      "ARCHIVE-ONLY MODE, STORAGE UNREACHABLE — this server runs without vLLM, and /health reports its archive bucket as unavailable, so stored archives cannot be read until storage recovers. OCR stays disabled by the operator. See the Monitoring tab for details.")
     : alertHtml("error",
-      "OCR backend unavailable — new parses and recognitions are paused until /health reports healthy. Results already shown stay available. See the Monitor tab for details."));
+      "OCR backend unavailable — new parses and recognitions are paused until /health reports healthy. Results already shown stay available. See the Monitoring tab for details."));
   if (authState !== "ok") alerts.push(alertHtml("error", AUTH_MESSAGES[authState]));
   // setHtml: the assertive region must not re-announce an unchanged banner.
   setHtml(document.getElementById("service-gate"), alerts.join(""));
@@ -910,7 +910,7 @@ function renderOcrResults(data, file, size) {
   });
 }
 
-// ── Monitor tab ───────────────────────────────────────────────
+// ── Monitoring tab ────────────────────────────────────────────
 // Polled only while the tab is open (startMonitor/stopMonitor from the tab
 // hook); the connbar keeps its own slower /health poll.
 
@@ -1022,7 +1022,7 @@ async function monitorTick() {
   } catch {
     if (!controller.signal.aborted) {
       setResetAvailable(false);
-      setHtml(document.getElementById("mon-table"), alertHtml("error", "Monitor refresh failed. Retrying on the next refresh."));
+      setHtml(document.getElementById("mon-table"), alertHtml("error", "Monitoring refresh failed. Retrying on the next refresh."));
       renderMonitorUpdated(false);
     }
   } finally {

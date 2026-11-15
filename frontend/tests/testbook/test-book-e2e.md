@@ -21,7 +21,7 @@ Review date: 2026-10-26 · Revision 2
 > slice against a running stack. Historical results do not apply to new cases.
 
 This book inventories **all five console tabs** (PARSE, OCR, RAG, STORAGE,
-MONITOR), the connection bar, authentication surfaces, math/table rendering,
+MONITORING), the connection bar, authentication surfaces, math/table rendering,
 the six offline field guides, and the MCP/agent acceptance layer.
 
 ## Reading and execution order
@@ -37,7 +37,7 @@ test.
 | OCR tab | [§2 Series SDM-OCR](#ocr) |
 | RAG tab | [§3 Series SDM-RAG](#rag) |
 | STORAGE tab | [§4 Series SDM-STO](#storage) |
-| MONITOR tab | [§5 Series SDM-MON](#monitor) |
+| MONITORING tab | [§5 Series SDM-MON](#monitor) |
 | Connection bar, auth, rendering, a11y | [§6 Series SDM-XUI](#crosscutting) |
 | Agent workflows (MCP + skill) | [§7 Series SDM-AGT](#agent) |
 | Offline field guides | [§8 Series SDM-GUI](#guides) |
@@ -153,7 +153,7 @@ an unconditional skip.
 ### 0.4 Known limitations / out of UI scope
 
 - **GPU autotune timing** (`full` run, 10–20 min) is a startup property, not a
-  per-run UI case: MONITOR surfaces its *result* (profile card), the run itself
+  per-run UI case: MONITORING surfaces its *result* (profile card), the run itself
   is verified by `scripts/verify_autotune_live.py`.
 - **vLLM internal flags** (tier T0–T4) have no UI surface; covered by
   `tests/test_autotune*.py`, `vllm/README.md` and §9.
@@ -279,7 +279,7 @@ Layer key: M = UI-mock · L = UI-live · B = Backend · S = Static.
 
 <a id="monitor"></a>
 
-## 5. Series SDM-MON — MONITOR tab
+## 5. Series SDM-MON — MONITORING tab
 
 | Case | Layer | Executable | Scenario / oracle |
 |---|---|---|---|
@@ -296,7 +296,7 @@ Layer key: M = UI-mock · L = UI-live · B = Backend · S = Static.
 | SDM-MON-011 | M | `audit-console.spec.mjs` | Reset keeps keyboard focus across refreshes |
 | SDM-MON-012 | M | `console.spec.mjs` | Health retests share probe; invalid nested metadata locks submissions; valid probe recovers; unexpected health rejection closes gate |
 | SDM-MON-013 | L | `live.spec.mjs` | Real `#conn-health-status` HEALTHY; `#mon-stats`/`#mon-table` populated after real parse+ocr |
-| SDM-MON-014 | M | `compliance.spec.mjs` | Archive-only health (`mode=archive_only`, `vllm=disabled`): connection bar HEALTHY with the mode in its detail, Parse and OCR tabs hidden (a hash pointing at them and arrow keys fall back to the visible tabs), Storage is the landing tab, no banner, RAG usable, Monitor shows vLLM DISABLED (neutral, never DOWN) and the mode tile; degraded archive-only (`storage.status=error`) shows DEGRADED and an alert naming the storage outage instead of promising archives |
+| SDM-MON-014 | M | `compliance.spec.mjs` | Archive-only health (`mode=archive_only`, `vllm=disabled`): connection bar HEALTHY with the mode in its detail, Parse and OCR tabs hidden (a hash pointing at them and arrow keys fall back to the visible tabs), Storage is the landing tab, no banner, RAG usable, Monitoring shows vLLM DISABLED (neutral, never DOWN) and the mode tile; degraded archive-only (`storage.status=error`) shows DEGRADED and an alert naming the storage outage instead of promising archives |
 
 <a id="crosscutting"></a>
 

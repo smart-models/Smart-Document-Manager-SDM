@@ -131,7 +131,7 @@ the relevant check BLOCKED; never substitute a mock or an old run silently.
 
 10. **Execute live browser console acceptance.** With the stack running, execute
     the live Playwright project (`npm run test:live` in `frontend/`) against the
-    authenticated console across Parse, OCR, RAG, Storage and Monitor tabs.
+    authenticated console across Parse, OCR, RAG, Storage and Monitoring tabs.
     Save results and screenshots under `10-playwright-live/`.
 
 11. **Execute live MCP and skill-guided acceptance.** Run

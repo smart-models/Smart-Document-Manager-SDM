@@ -1,4 +1,4 @@
-// Regressions from the Parse/OCR/Storage/Monitor audit.
+// Regressions from the Parse/OCR/Storage/Monitoring audit.
 import { expect, test, openHealthyConsole, HEALTH, IMAGE, PARSE, OCR } from "./fixtures.mjs";
 
 const PAGE = { page: 1, width: 1, height: 1, markdown: "# Kept result", blocks: [], error: null };

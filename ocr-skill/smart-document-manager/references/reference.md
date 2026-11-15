@@ -28,9 +28,9 @@ text names the API `code` when one exists, plus the next action.
 
 | API operation | MCP | Console |
 |---|---|---|
-| GET /health | ocr_check_health | Connection status and Monitor |
-| GET /stats | ocr_get_stats | Monitor |
-| GET /metrics | ocr://metrics resource | Monitor |
+| GET /health | ocr_check_health | Connection status and Monitoring |
+| GET /stats | ocr_get_stats | Monitoring |
+| GET /metrics | ocr://metrics resource | Monitoring |
 | POST /parse | ocr_parse_document | Parse |
 | GET /parse/progress/{progress_id} | ocr_parse_document (relayed as MCP progress) | Parse progress |
 | POST /ocr | ocr_recognize_image | OCR |

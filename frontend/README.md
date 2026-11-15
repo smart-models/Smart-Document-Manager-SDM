@@ -100,7 +100,7 @@ Run all commands from `frontend/`:
   connection bar stays HEALTHY with `archive-only · vllm disabled` in its
   detail, the Parse and OCR tabs are hidden (hash and arrow-key navigation
   skip them) and Storage becomes the landing tab with no banner; RAG stays
-  usable and the Monitor shows vLLM as DISABLED (neutral, never DOWN) next to a
+  usable and the Monitoring tab shows vLLM as DISABLED (neutral, never DOWN) next to a
   `mode` tile. A degraded archive-only server (bucket probe failing) keeps
   DISABLED for vLLM but shows an alert that names the storage outage and never
   claims the archives are available.

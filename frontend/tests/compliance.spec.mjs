@@ -85,7 +85,7 @@ test("archive-only health keeps the API healthy, hides the OCR tabs and lands on
   await page.locator("#tab-monitor").press("Home");
   await expect(page.locator("#tab-rag")).toHaveAttribute("aria-selected", "true");
   await page.locator("#tab-storage").click();
-  // Monitor shows vLLM as DISABLED (neutral) and names the mode, never DOWN.
+  // Monitoring shows vLLM as DISABLED (neutral) and names the mode, never DOWN.
   await page.locator("#tab-monitor").click();
   await expect(page.locator("#mon-badges")).toContainText("DISABLED");
   await expect(page.locator("#mon-badges")).not.toContainText("DOWN");
