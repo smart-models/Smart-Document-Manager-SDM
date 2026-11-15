@@ -8,8 +8,8 @@
       "GHSA-h35f-9h28-mq5c",
       "PYSEC-2026-3447"
     ],
-    "expires": "2026-11-17",
-    "reason": "CVE-2026-59890 affects source-distribution publishing with Unicode-normalizing filesystems. This Linux model server does not build or publish sdists; that operation is absent from its request path. vLLM 0.32.0 requires setuptools <81 on Python 3.12, so installing 83 would break its declared requirements. Review again if the runtime or its build responsibilities change.",
+    "expires": "2027-01-31",
+    "reason": "CVE-2026-59890 affects source-distribution publishing with Unicode-normalizing filesystems (macOS APFS/HFS+). This Linux model server does not build or publish sdists; that operation is absent from its request path. The fix exists only in 83.0.0 and later, with no 80.x backport, while vLLM 0.32.0 requires setuptools <81 on Python 3.12; vLLM 0.33.0 and LMCache 0.5.7.post1, the latest releases on 2026-11-15, keep the same <81 bound, so installing 83 would break the declared requirements of both. Review again if the runtime or its build responsibilities change, or when vLLM or LMCache allow setuptools 83 or later.",
     "source": "https://github.com/pypa/setuptools/security/advisories/GHSA-h35f-9h28-mq5c",
     "image_id": "sha256:997d33d1c4ce0878c518833aa641fa36fe66fb182ce0d46201a718e58a99bc16"
   },
