@@ -8,6 +8,9 @@ pillow==13.0.0
 # GHSA-2qm8-x737-gmw5 / GHSA-9m75-vc3g-4x39 / GHSA-fm9c-5rcf-2q5p /
 # GHSA-mm57-4v3p-rchx: quadratic-time BER/CER/DER decoding; fixed in 0.6.5.
 pyasn1==0.6.5
+# GHSA-mmhr-3c5m-f64f / CVE-2026-126190: polynomial-time descendant-combinator
+# matching in soupsieve; fixed in 4.0.0.
+soupsieve==4.1.1
 # GHSA-hq85-5cpj-mr62 / PYSEC-2026-4321: uv's bundled CA store trusts the same
 # compromised emSign root; fixed in 0.13.4.
 uv==0.13.4

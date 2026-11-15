@@ -1,10 +1,10 @@
 {
   "app": {
     "image": "ocr-api:latest",
-    "image_id": "sha256:c3daa00190413a8512c30bfde110b027a9e275136b92e58a1984318cf54c9e9e",
+    "image_id": "sha256:e58fdd23673553739f3b597dbc570f7072e732f11574bb86b9557dfcf8f3fe80",
     "python": "3.11.16",
     "lock": "app-py311-linux.txt",
-    "sha256": "80e2754f62a7379dd3fb5e3fec08eb0bb8adfd455b0f91c230e1198f4f459998"
+    "sha256": "6b3c2b7e8d12ab1527dddd297b5836f4a8f169be0dfc40a23b3a4994b542d6ca"
   },
   "mcp": {
     "image": "personal-smart-ocr-mcp:latest",
