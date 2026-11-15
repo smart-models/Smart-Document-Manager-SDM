@@ -21,7 +21,7 @@ def main() -> None:
     to ``0.0.0.0`` because inside its own namespace that is exactly what the
     published-port restriction assumes.
     """
-    parser = argparse.ArgumentParser(description="Personal Smart OCR MCP server")
+    parser = argparse.ArgumentParser(description="Smart Document Manager MCP server")
     parser.add_argument("--transport", choices=["http", "stdio"], default="http")
     args = parser.parse_args()
     if args.transport == "stdio":

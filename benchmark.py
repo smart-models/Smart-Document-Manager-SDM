@@ -1,4 +1,4 @@
-"""Reproducible quality and performance harness for Personal Smart OCR.
+"""Reproducible quality and performance harness for Smart Document Manager.
 
 The harness deliberately separates a small, deterministic tuning split from the
 holdout used to validate a chosen configuration. It records raw API responses,

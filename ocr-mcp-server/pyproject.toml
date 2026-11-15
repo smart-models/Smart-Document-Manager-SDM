@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "personal-smart-ocr-mcp"
 version = "1.0.0"
-description = "MCP tools, resources and workflows for Personal Smart OCR"
+description = "MCP tools, resources and workflows for Smart Document Manager"
 requires-python = ">=3.11"
 dependencies = [
     "mcp==2.3.0",

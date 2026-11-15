@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Personal Smart OCR RAG chunks — normative output v1.1",
+  "title": "Smart Document Manager RAG chunks — normative output v1.1",
   "description": "Structural schema; semantic invariants and JCS serialization are defined in the PRD.",
   "type": "object",
   "properties": {

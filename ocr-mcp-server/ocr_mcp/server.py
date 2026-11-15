@@ -62,7 +62,7 @@ class OCRServer(MCPServer):
 
 
 _SERVER_INSTRUCTIONS = (
-    "Personal Smart OCR: fourteen tools over the OCR API.\n"
+    "Smart Document Manager: fourteen tools over the OCR API.\n"
     "Load the smart-document-manager skill before the first tool call when the\n"
     "client has it, or read docs://ocr/skill: it holds the operating rules for\n"
     "every tool, a health check or an archive listing as much as a parse.\n"

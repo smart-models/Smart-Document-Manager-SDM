@@ -161,3 +161,37 @@ def test_agent_skills_use_current_product_branding():
     for skill in ("smart-document-manager", "smart-document-reader"):
         skill_text = _read(f"ocr-skill/{skill}/SKILL.md")
         assert PRODUCT_NAME in skill_text, skill
+
+
+@pytest.mark.parametrize(
+    "relative_path",
+    [
+        "ocr-mcp-server/ocr_mcp/server.py",
+        "ocr-mcp-server/ocr_mcp/__main__.py",
+        "ocr-mcp-server/pyproject.toml",
+        "ocrserver/chunking/rag.schema.json",
+        "ocr-mcp-server/ocr_mcp/rag.schema.json",
+        "tests/fixtures/ocr-rag-chunks.schema.json",
+        "benchmark.py",
+    ],
+)
+def test_runtime_strings_use_the_current_product_name(relative_path):
+    """Keep the legacy display name out of strings that clients and tools show.
+
+    These files carry the MCP server instructions every client receives, the
+    CLI help text, the wheel description, the RAG schema titles and the
+    benchmark docstring. Stable identifiers that still contain the old slug,
+    such as the ``personal-smart-ocr-mcp`` package and image names or the
+    benchmark seeds, are lowercase and therefore unaffected by this check.
+    """
+    text = _read(relative_path)
+    assert PRODUCT_NAME in text, relative_path
+    for legacy_name in LEGACY_DISPLAY_NAMES:
+        assert legacy_name not in text, relative_path
+
+
+def test_mcp_server_instructions_open_with_the_current_product_name():
+    """The first line of the MCP instructions names the product to the client."""
+    from ocr_mcp.server import _SERVER_INSTRUCTIONS
+
+    assert _SERVER_INSTRUCTIONS.startswith(f"{PRODUCT_NAME}: ")
