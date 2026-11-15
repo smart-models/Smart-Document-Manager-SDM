@@ -38,5 +38,18 @@
     "reason": "CVE-2026-114603 is reached through TraceState.from_header when a W3C propagator extracts an inbound tracestate header. In vLLM 0.32.0 that extraction (vllm/tracing/otel.py extract_trace_context) runs only when --otlp-traces-endpoint is set; build_vllm_command never passes it or --tool-server and accepts no extra arguments, and no ASGI OpenTelemetry instrumentation is installed or registered. LMCache 0.5.6, the latest release in the base image, requires opentelemetry-api<=1.40.0, so the fixed 1.45.1 would break its declared requirements. Review again if tracing is enabled or LMCache allows a fixed release.",
     "source": "https://github.com/open-telemetry/opentelemetry-python/security/advisories/GHSA-xcq7-p3pf-p88h",
     "image_id": "sha256:819b12cf00371a60df3cc4f8b332b8636e30fdf5242a48daa8745959eb4f98ca"
+  },
+  {
+    "lock": "vllm-py312-linux.txt",
+    "sha256": "f5477eca645835a5db2dd8feca6c9815ebdf4260985fd3079d7e73e409d80e44",
+    "package": "opentelemetry-api",
+    "version": "1.40.0",
+    "advisories": [
+      "GHSA-mf5v-w3w3-f6cg"
+    ],
+    "expires": "2027-01-31",
+    "reason": "CVE-2026-126360 is quadratic-time regex backtracking in TraceContextTextMapPropagator.extract() on a crafted traceparent that embeds a newline. In vLLM 0.32.0 the propagator sees request data only through extract_trace_context (vllm/tracing/otel.py), fed with trace_headers that AsyncLLM.add_request (vllm/v1/engine/async_llm.py) drops when otlp_traces_endpoint is None; the other caller, _get_smart_context, reads only os.environ. build_vllm_command never passes --otlp-traces-endpoint or --tool-server and accepts no extra arguments, and vLLM creates no MCP server, so the MCP SDK's OpenTelemetryMiddleware (the params._meta carrier the advisory names) never runs; conforming HTTP header values cannot carry the newline either. LMCache 0.5.7.post1, its latest release on 2026-11-15, requires opentelemetry-api<=1.40.0, so the fixed 1.45.2 would break its declared requirements. Review again if tracing is enabled, vLLM gains an MCP server, or LMCache allows a fixed release.",
+    "source": "https://github.com/open-telemetry/opentelemetry-python/security/advisories/GHSA-mf5v-w3w3-f6cg",
+    "image_id": "sha256:819b12cf00371a60df3cc4f8b332b8636e30fdf5242a48daa8745959eb4f98ca"
   }
 ]
