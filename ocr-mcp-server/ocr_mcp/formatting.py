@@ -28,6 +28,46 @@ class ResponseFormat(str, Enum):
     JSON = "json"
 
 
+QUALITY_NOTE = (
+    "Chunks carry no mark for these pages: check or exclude them before "
+    "loading chunks into a vector store; their text may be incomplete."
+)
+
+
+def flagged_pages(warnings: object) -> dict[str, list[int]]:
+    """Pages (1-based) that a parse's quality warnings name.
+
+    Mirrors the two page lists the API writes into the json_rag metadata; the
+    services share no code, so the rule is repeated here. A page stays listed
+    whatever became of its suspect block. Malformed entries are ignored: the
+    parse may come from a client.
+    """
+    found: dict[str, set[int]] = {
+        "low_layout_confidence_pages": set(),
+        "suspect_table_pages": set(),
+    }
+    for warning in warnings if isinstance(warnings, list) else []:
+        if not isinstance(warning, dict):
+            continue
+        target = warning.get("target")
+        index = target.get("index") if isinstance(target, dict) else None
+        if isinstance(index, bool) or not isinstance(index, int):
+            continue
+        if warning.get("code") == "layout_low_confidence":
+            found["low_layout_confidence_pages"].add(index + 1)
+        elif warning.get("code") == "table_suspect":
+            found["suspect_table_pages"].add(index + 1)
+    return {name: sorted(pages) for name, pages in found.items()}
+
+
+def pages_text(pages: list, limit: int = 20) -> str:
+    """Render a page list as bounded text, such as ``3 pages: 2, 7, 9``."""
+    shown = ", ".join(str(page) for page in pages[:limit])
+    if len(pages) > limit:
+        return f"{len(pages)} pages, the first {limit}: {shown}"
+    return f"{len(pages)} page{'' if len(pages) == 1 else 's'}: {shown}"
+
+
 def bullet(label: str, value: object) -> str:
     """Render one markdown fact line, showing an em dash for missing values."""
     shown = "—" if value is None or value == "" else value

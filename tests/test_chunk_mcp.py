@@ -455,3 +455,83 @@ async def test_rag_tool_accepts_base64_with_trailing_newline():
     text = result.content[0].text
     assert "Invalid base64" not in text
     assert "OCR backend unavailable" in text
+
+
+@pytest.mark.parametrize("fmt", ["markdown", "json"])
+async def test_rag_summary_names_the_flagged_pages_of_the_parse_it_chunks(fmt):
+    from test_mcp_tools import QUALITY_WARNINGS
+
+    document = {**INPUT, "warnings": QUALITY_WARNINGS}
+    async with harness(lambda request: httpx.Response(200, json=RAG)) as (client, _):
+        result = await client.call_tool(
+            "ocr_create_rag_chunks",
+            {
+                "params": {
+                    "parsed_document": document,
+                    "options": {"max_tokens": 512},
+                    "response_format": fmt,
+                }
+            },
+        )
+        plain = await client.call_tool(
+            "ocr_create_rag_chunks",
+            {
+                "params": {
+                    "parsed_document": INPUT,
+                    "options": {"max_tokens": 512},
+                    "response_format": fmt,
+                }
+            },
+        )
+
+    # The chunks, what a vector store receives, are the same either way.
+    assert not result.is_error
+    assert result.structured_content == RAG == plain.structured_content
+    text = result.content[0].text
+    summary = json.loads(text) if fmt == "json" else None
+    if summary:
+        assert summary["low_layout_confidence_pages"] == "1 page: 2"
+        # Page 5 is named too, although its second reading was kept.
+        assert summary["suspect_table_pages"] == "2 pages: 3, 5"
+    else:
+        assert "- low_layout_confidence_pages: 1 page: 2" in text
+        assert "- suspect_table_pages: 2 pages: 3, 5" in text
+    assert "no mark" in text
+    for word in ("low_layout_confidence_pages", "suspect_table_pages", "no mark"):
+        assert word not in plain.content[0].text
+
+
+async def test_rag_summary_stays_bounded_when_many_pages_are_flagged():
+    from test_mcp_tools import QUALITY_WARNINGS
+
+    many = [
+        {**QUALITY_WARNINGS[0], "target": {"field": "page", "index": index}}
+        for index in range(900)
+    ]
+    document = {**INPUT, "warnings": many}
+    async with harness(lambda request: httpx.Response(200, json=RAG)) as (client, _):
+        result = await client.call_tool(
+            "ocr_create_rag_chunks",
+            {"params": {"parsed_document": document, "options": {"max_tokens": 512}}},
+        )
+
+    assert not result.is_error
+    assert "900 pages, the first 20: 1, 2, 3" in result.content[0].text
+
+
+async def test_rag_summary_ignores_malformed_warnings():
+    document = {
+        **INPUT,
+        "warnings": [
+            {"code": "table_suspect", "message": "no target"},
+            {"code": "table_suspect", "message": "x", "target": {"index": "two"}},
+            {"code": "layout_low_confidence", "message": "x", "target": None},
+        ],
+    }
+    async with harness(lambda request: httpx.Response(200, json=RAG)) as (client, _):
+        result = await client.call_tool(
+            "ocr_create_rag_chunks",
+            {"params": {"parsed_document": document, "options": {"max_tokens": 512}}},
+        )
+
+    assert "suspect_table_pages" not in result.content[0].text

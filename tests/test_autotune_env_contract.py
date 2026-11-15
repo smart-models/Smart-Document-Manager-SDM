@@ -259,6 +259,20 @@ def _ocr_api_service() -> str:
     return compose[start:end]
 
 
+def test_table_reread_default_is_set_in_settings_alone():
+    import re
+    from pathlib import Path
+
+    from ocrserver.config import Settings
+
+    # Compose and the template pass an empty value, so flipping the default is
+    # one line in ocrserver/config.py.
+    assert "OCR_TABLE_REREAD: ${OCR_TABLE_REREAD:-}" in _ocr_api_service()
+    template = (Path(__file__).resolve().parents[1] / ".env.example").read_text()
+    assert re.search(r"^OCR_TABLE_REREAD=$", template, re.M)
+    assert Settings().table_reread is True
+
+
 def test_ocr_api_runs_layout_on_the_gpu_with_a_memory_cap():
     service = _ocr_api_service()
     assert "driver: nvidia" in service and "capabilities: [gpu]" in service

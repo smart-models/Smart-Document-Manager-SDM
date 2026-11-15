@@ -46,8 +46,11 @@ are MCP calls (`name` plus `arguments`) with concrete values.
    stored-document playbook instead of the response.
 4. Call `ocr_parse_document` once with the approved parameters.
 5. Read `warnings` and every page `error`: `pages_truncated`, `pages_unprocessed`
-   (timeout, still HTTP 200), `page_failed`, kept HTML tables. Check page
-   `width`/`height` before using `bbox`.
+   (timeout, still HTTP 200), `page_failed`, kept HTML tables;
+   `layout_low_confidence` and `table_suspect` name a page that has no error
+   and may still miss text (`reread` `kept`: a second reading replaced the
+   block, usually whole).
+   Check page `width`/`height` before using `bbox`.
 6. Report content with page references. Preserve merged cells and do not fill in
    missing text. More pages need an explicit new run from page 1.
 7. The result carries no archive id. With storage on, find the archive it created
@@ -86,6 +89,7 @@ are MCP calls (`name` plus `arguments`) with concrete values.
 - [ ] Saved parse JSON used when it exists
 - [ ] Document mode: max_pages given for documents over OCR_MAX_PAGES
 - [ ] Strict conflicts explained, no option changed silently
+- [ ] Pages under layout_low_confidence or table_suspect named before chunks are loaded anywhere
 ```
 
 1. For an archived parse pass its `json_ocr.json` key as `source_key`: the MCP
@@ -103,6 +107,14 @@ are MCP calls (`name` plus `arguments`) with concrete values.
 5. Use the complete structured `chunks`. On the MCP 8 MiB limits, report
    `recovery_route` for a human or REST client. Explain `first_row` headers as an
    assumption and `lang` as metadata.
+6. Chunks carry no mark for a page the parse warned about. Take the pages of
+   `layout_low_confidence` and `table_suspect` from the parse `warnings` or the
+   tool's text summary, tell the user their text may be incomplete, and load
+   the chunks into a vector store only after the user chose: as they are,
+   without those pages, or after a check against the source. Document mode
+   returns no warnings: with storage on read them in the archive manifest,
+   without storage parse first with `ocr_parse_document` and chunk that result
+   as `parsed_document`.
 
 ```json
 {"name":"ocr_create_rag_chunks","arguments":{"params":{"source_key":"invoice.pdf__20261018T120000000000Z__job123AB/json_ocr.json","options":{"max_tokens":512}}}}
@@ -179,6 +191,8 @@ The detail from `ocr_get_storage_archive` already carries the manifest and the
 
 1. `json_ocr.json` up to about 250 KB: download it whole.
 2. Larger: `json_rag.json` up to about 350 KB, when `files[]` lists one. Its
+   `metadata.low_layout_confidence_pages` and `metadata.suspect_table_pages`
+   name pages whose text may be incomplete; the chunks are not marked. Its
    chunks keep `page`, type and, when the page has them, header, footer,
    footnotes and page labels, so pages can still be cited; block ids, boxes and
    caption links are gone — say so.

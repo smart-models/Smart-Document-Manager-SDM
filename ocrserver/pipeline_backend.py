@@ -13,11 +13,18 @@ from typing import Any
 import numpy as np
 from PIL import Image
 
+from ocrserver import quality
 from ocrserver.config import Settings
 from ocrserver.element_ocr import check_pixel_limit, upright_rgb
 from ocrserver.schemas import Block
 
 logger = logging.getLogger(__name__)
+
+# Second readings are made only while more than this much of a call's budget is
+# left; then the pages still waiting go out with their first reading. It leaves
+# the caller time to collect them. A second reading that loops again runs to
+# the token cap: 25 s on the 8 GB card it was measured on.
+REREAD_SECONDS = 60.0
 
 
 def to_bgr_ndarray(image: bytes | Image.Image | np.ndarray) -> np.ndarray:
@@ -92,6 +99,11 @@ def image_to_png_bytes(image: Any) -> bytes:
         if owns_image:
             pil_image.close()
     return output.getvalue()
+
+
+def _block_id(block: Block, position: int) -> int:
+    """PaddleX numbers a page's blocks by position; fall back to it."""
+    return position if block.block_id is None else block.block_id
 
 
 def _page_dimension(value: Any) -> int | None:
@@ -238,7 +250,13 @@ class PipelineBackend:
         return self._pipeline
 
     @staticmethod
-    def _extract_result(res: Any) -> dict:
+    def _extract_result(res: Any, dpi: int | None = None) -> dict:
+        """Turn a PaddleX page result into the page dict the API works with.
+
+        ``quality`` carries what ocrserver.quality finds: the median score of
+        the layout boxes, and the table or list blocks that look like a reading
+        loop. ``dpi`` is the resolution the page was rendered at, if any.
+        """
         markdown_result = getattr(res, "markdown", "") or ""
         markdown_images: dict = {}
         if isinstance(markdown_result, dict):
@@ -257,13 +275,101 @@ class PipelineBackend:
                 images.append({"name": str(name), "png": image_to_png_bytes(image)})
             except (OSError, TypeError, ValueError):
                 logger.warning("could not encode Paddle markdown image %s", name)
+        blocks = normalize_blocks(raw_blocks)
+        suspects = []
+        for position, block in enumerate(blocks):
+            reason = quality.suspect_reason(block.type, block.bbox, block.content, dpi)
+            if reason:
+                suspects.append(
+                    {
+                        "block_id": _block_id(block, position),
+                        "block_type": block.type,
+                        "reason": reason,
+                        "megapixels": round(quality.megapixels(block.bbox, dpi), 3),
+                        "chars": len(block.content),
+                    }
+                )
+        layout = res_data.get("layout_det_res")
+        boxes = layout.get("boxes") if isinstance(layout, dict) else None
+        score = quality.layout_score(boxes or [])
         return {
             "markdown": markdown,
-            "blocks": normalize_blocks(raw_blocks),
+            "blocks": blocks,
             "images": images,
             "width": _page_dimension(res_data.get("width")),
             "height": _page_dimension(res_data.get("height")),
+            "quality": {
+                "layout_score": None if score is None else round(score, 3),
+                "suspects": suspects,
+            },
         }
+
+    def _second_look(
+        self,
+        pipeline: Any,
+        array: np.ndarray,
+        res: Any,
+        page: dict,
+        dpi: int | None,
+        wanted: Callable[[], bool],
+    ) -> dict:
+        """Read a page's suspect blocks once more; return the page to deliver.
+
+        Runs after the stream ended, under the predict lock: only then is a
+        second predict safe. Each crop is read without layout detection, at the
+        size quality.reread_options gives. A reading quality.keeps_reread
+        accepts is written into the PaddleX block, and the page is extracted
+        again so that blocks and Markdown both carry it; anything else leaves
+        the first reading. ``reread`` on each suspect says which: ``kept``,
+        ``rejected`` or ``skipped`` (the reading failed, or ``wanted`` said the
+        page no longer waits for it). ``page`` itself is never changed: it is
+        the first reading, which parse_document may deliver at any moment.
+        """
+        positions = {
+            _block_id(block, position): position
+            for position, block in enumerate(page["blocks"])
+        }
+        suspects = [dict(suspect) for suspect in page["quality"]["suspects"]]
+        kept = False
+        for suspect in suspects:
+            if not wanted():
+                break
+            position = positions[suspect["block_id"]]
+            block = page["blocks"][position]
+            left, top, right, bottom = (max(0, int(value)) for value in block.bbox)
+            crop = np.ascontiguousarray(array[top:bottom, left:right])
+            if not crop.size:
+                continue
+            try:
+                results = list(
+                    pipeline.predict(
+                        crop,
+                        temperature=0.0,
+                        use_layout_detection=False,
+                        prompt_label="table" if block.type == "table" else "ocr",
+                        **quality.reread_options(crop.shape[1], crop.shape[0]),
+                    )
+                )
+                data = results[0].json
+                data = data.get("res", data)
+                second = data["parsing_res_list"][0].get("block_content") or ""
+            except Exception as exc:  # noqa: BLE001 - the first reading stays
+                logger.warning(
+                    "second reading of a block failed: %s", type(exc).__name__
+                )
+                continue
+            if quality.keeps_reread(
+                suspect["reason"], block.content, second, block.type, block.bbox, dpi
+            ):
+                res["parsing_res_list"][position].content = second
+                suspect["reread"] = "kept"
+                kept = True
+            else:
+                suspect["reread"] = "rejected"
+        # PaddleX rebuilds JSON and Markdown from its blocks on every access.
+        result = self._extract_result(res, dpi) if kept else dict(page)
+        result["quality"] = {**page["quality"], "suspects": suspects}
+        return result
 
     async def parse_document(
         self,
@@ -274,6 +380,8 @@ class PipelineBackend:
         *,
         close_images: bool = False,
         on_page: Callable[[dict], None] | None = None,
+        dpi: int | None = None,
+        reread: bool = False,
     ) -> list[dict]:
         """Run the pipeline on all pages with ONE streaming predict call.
 
@@ -294,6 +402,20 @@ class PipelineBackend:
         per-page semantics). On timeout/error the remaining pages are marked
         failed. The worker retains its slot until native work ends. With
         close_images=True, ownership of PIL inputs transfers to this call.
+
+        Each page also carries "quality" (see _extract_result); dpi, the
+        resolution the pages were rendered at, scales its thresholds. With
+        reread=True (the API passes OCR_TABLE_REREAD; calibration never asks)
+        a page holding a suspect table or list block is
+        kept back, together with the pages after it, until the stream ends;
+        its suspect blocks are then read once more (_second_look) and the
+        pages are delivered in order. That lasts only while more than
+        REREAD_SECONDS of the budget above are left: at that point a timer
+        delivers every waiting page with its first reading, a second reading
+        still running is dropped, and nothing more is kept back. So a waiting
+        page is never lost to the second look, and a budget of REREAD_SECONDS
+        or less means no second reading at all. A document with no suspect
+        block streams exactly as before.
         """
         if not images:
             return []
@@ -314,7 +436,23 @@ class PipelineBackend:
                 except RuntimeError:
                     abandoned.set()
 
+        # Pages waiting for a second reading, in page order: every page from the
+        # first one with a suspect block on, so that pages keep their order.
+        # Each already holds its complete first reading and must never be lost
+        # to the second look: release() delivers them all as they are.
+        held: list[tuple[int, Any, dict]] = []
+        guard = threading.Lock()
+        holding = threading.Event()
+
+        def release() -> None:
+            with guard:
+                holding.clear()
+                for _, _, waiting in held:
+                    emit("page", waiting)
+                held.clear()
+
         def _worker() -> None:
+            timer: threading.Timer | None = None
             try:
                 with self._predict_lock:
                     if abandoned.is_set():
@@ -329,20 +467,77 @@ class PipelineBackend:
                         getattr(pipeline, "predict_iter", None) or pipeline.predict
                     )
                     stream = iterate(arrays, temperature=0.0)
+                    # Pages are kept back only while more than REREAD_SECONDS of
+                    # the budget are left. The timer ends that on its own, with
+                    # no page needed to arrive: a stalled stream or a slow
+                    # second reading cannot take a waiting page past the deadline.
+                    spare = deadline - REREAD_SECONDS - time.monotonic()
+                    if reread and spare > 0:
+                        holding.set()
+                        timer = threading.Timer(spare, release)
+                        timer.daemon = True
+                        timer.start()
                     try:
-                        for res in stream:
+                        for index, res in enumerate(stream):
                             if abandoned.is_set():
                                 # A departed caller: stop instead of running
                                 # layout and VL for the rest of the block.
                                 break
-                            emit("page", self._extract_result(res))
+                            page = self._extract_result(res, dpi)
+                            suspects = page["quality"]["suspects"]
+                            for suspect in suspects:
+                                suspect["reread"] = "skipped" if reread else "off"
+                            with guard:
+                                if holding.is_set() and (held or suspects):
+                                    # The PaddleX result, which holds the page
+                                    # image, is kept only to read a block again.
+                                    waits = res if suspects else None
+                                    held.append((index, waits, page))
+                                else:
+                                    emit("page", page)
+                    except Exception:
+                        # The stream failed: hand over what it read before.
+                        release()
+                        raise
                     finally:
                         close = getattr(stream, "close", None)
                         if close is not None:
                             close()
+                    # The stream is over and the pipeline idle: a second predict
+                    # is safe now. Pages leave in order, one at a time.
+                    while not abandoned.is_set():
+                        with guard:
+                            if not held:
+                                break
+                            index, res, page = held[0]
+                        result = page
+                        if res is not None:
+                            try:
+                                result = self._second_look(
+                                    pipeline,
+                                    arrays[index],
+                                    res,
+                                    page,
+                                    dpi,
+                                    lambda: holding.is_set() and not abandoned.is_set(),
+                                )
+                            except Exception as exc:  # noqa: BLE001 - first reading stays
+                                logger.warning(
+                                    "second look at a page failed: %s",
+                                    type(exc).__name__,
+                                )
+                        with guard:
+                            if not held or held[0][2] is not page:
+                                # Released meanwhile: the first readings went
+                                # out, and this second reading came too late.
+                                break
+                            held.pop(0)
+                            emit("page", result)
             except Exception as exc:  # noqa: BLE001 — forwarded to the caller
                 emit("error", exc)
             finally:
+                if timer is not None:
+                    timer.cancel()
                 if close_images:
                     for image in images:
                         if isinstance(image, Image.Image):

@@ -6,7 +6,7 @@ from mcp_types import CallToolResult, TextContent
 
 from ocr_mcp import __version__
 from ocr_mcp.errors import ChunkTransferLimit, ToolError
-from ocr_mcp.formatting import ResponseFormat
+from ocr_mcp.formatting import QUALITY_NOTE, ResponseFormat, pages_text
 
 
 def compact_bytes(value) -> bytes:
@@ -42,11 +42,14 @@ def check_arguments(params, settings, route, *, prepared=None):
         )
 
 
-def rag_result(payload, presentation, settings, route):
+def rag_result(payload, presentation, settings, route, flagged=None):
     """Build a bounded summary alongside the complete structured RAG payload.
 
     Measure the serialized MCP result including server metadata. Raise a local
     transfer refusal rather than returning partial structured content.
+    ``flagged`` holds the pages the chunked parse warned about (see
+    formatting.flagged_pages): they are named in the summary only, because the
+    chunks, what a vector store receives, carry no mark.
     """
     summary = {
         "chunks": len(payload["chunks"]),
@@ -55,6 +58,11 @@ def rag_result(payload, presentation, settings, route):
         "diagnostics": sum(len(chunk["diagnostics"]) for chunk in payload["chunks"]),
         "data": "Complete RAG JSON is in structured content.",
     }
+    named = {
+        name: pages_text(pages) for name, pages in (flagged or {}).items() if pages
+    }
+    if named:
+        summary.update(named, quality=QUALITY_NOTE)
     text = (
         compact_bytes(summary).decode("utf-8")
         if presentation is ResponseFormat.JSON

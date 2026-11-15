@@ -11,7 +11,13 @@ from mcp.server.mcpserver import Context
 from ocr_mcp.client import UpstreamClient
 from ocr_mcp.context import ToolContext
 from ocr_mcp.errors import error_result
-from ocr_mcp.formatting import StructuredToolResult, bullet, render
+from ocr_mcp.formatting import (
+    QUALITY_NOTE,
+    StructuredToolResult,
+    bullet,
+    pages_text,
+    render,
+)
 from ocr_mcp.inputs import ParseDocumentInput, RecognizeImageInput, source_body
 from ocr_mcp.responses import validate_payload
 from ocr_mcp.tools.health import require_healthy
@@ -74,6 +80,21 @@ def _warnings(payload: dict) -> list[str]:
     ]
 
 
+def _json_rag_rows(payload: dict) -> list[str]:
+    """Name the pages of the json_rag export that its chunks do not mark."""
+    export = payload.get("json_rag")
+    metadata = export.get("metadata") if isinstance(export, dict) else None
+    rows = []
+    for key, label in (
+        ("low_layout_confidence_pages", "json_rag pages with low layout confidence"),
+        ("suspect_table_pages", "json_rag pages with a suspect table or list"),
+    ):
+        pages = metadata.get(key) if isinstance(metadata, dict) else None
+        if isinstance(pages, list) and pages:
+            rows.append(bullet(label, pages_text(pages)))
+    return [*rows, f"- {QUALITY_NOTE}"] if rows else []
+
+
 def _parse_rows(payload: dict) -> list[str]:
     rows = [bullet("Processing time (ms)", payload["processing_time_ms"])]
     for page in payload["pages"]:
@@ -91,7 +112,7 @@ def _parse_rows(payload: dict) -> list[str]:
             rows.append(
                 bullet("Figure crops in structured content", len(page["images"]))
             )
-    return rows + _warnings(payload)
+    return rows + _warnings(payload) + _json_rag_rows(payload)
 
 
 def _ocr_rows(payload: dict) -> list[str]:

@@ -101,6 +101,7 @@ Client / Console / MCP ──► ocr_server.py + ocrserver/ (FastAPI, :8020) ─
 | `config.py` | `Settings` dataclass, validation invariants, and environment/profile precedence | Any `OCR_*` or `MAX_FILE_BYTES` setting is added or changed |
 | `schemas.py` | Pydantic request/response models (`ParseJsonRequest`, `ParseResponse`, `OcrJsonRequest`, `OcrResponse`), warning builders, OpenAPI multipart helpers | Public REST JSON contracts or task enums change |
 | `pipeline_backend.py` | `PipelineBackend`: orchestrates `PP-DocLayoutV3` layout detection, reading order, crop dispatch to `vllm-paddleocr`, and page assembly | Layout-to-VLM orchestration or concurrency lanes change |
+| `quality.py` | Pure rules that mark a badly read page or block: layout score, reading-loop signs on table and list blocks, the second reading's size and its acceptance check; thresholds are constants with their evidence named | A `layout_low_confidence` or `table_suspect` rule or threshold changes |
 | `vllm_client.py` | Async OpenAI-compatible client for `vllm-paddleocr`, circuit breaker, retries, and token usage extraction | Upstream vLLM request parameters or circuit-breaker rules change |
 | `element_ocr.py` | Image decoding, DecompressionBomb/multiframe guards, spotting upscaling/parsing, and element task prompts | `/ocr` image handling or spotting coordinates change |
 | `pdf_utils.py` | `pypdfium2` PDF signature detection (including BOM/leading whitespace), page count, and pixel-budget rasterization | PDF validation or rasterization DPI logic changes |
@@ -161,6 +162,9 @@ descriptions live in [`.env.example`](../.env.example) and
   `OCR_PAGE_PARALLELISM`, `OCR_LAYOUT_THREADS`, `OCR_VL_MAX_INFLIGHT`,
   `OCR_LAYOUT_GPU_MEMORY_MB` (`3584`, layout VRAM cap), `OCR_API_CPUS` (`4.0`),
   `OCR_VLLM_URL`, `OCR_VLLM_SERVED_MODEL`, `OCR_VLLM_MODEL_REVISION`.
+- **Reading quality**: `OCR_TABLE_REREAD` (empty in the template; the default,
+  `true`, is set in `config.py` alone) reads a looping table or list block a
+  second time; `false` only warns.
 - **S3 storage (`OCR_STORAGE_*`, `OCR_S3_*`)**: `OCR_STORAGE_ENABLED`,
   `OCR_STORAGE_BROWSER_ENABLED`, `OCR_S3_ENDPOINT`, `OCR_S3_BUCKET`, writer and
   browser credentials.
@@ -194,6 +198,45 @@ descriptions live in [`.env.example`](../.env.example) and
   A block that exceeds its own `OCR_PAGE_TIMEOUT` share with budget left yields
   `page_failed` pages and the next block runs. A client disconnect interrupts
   the running block, starts no other and skips the archive.
+- **Reading quality is checked and reported, and a looping block is read a second time.**
+  `quality.py` judges every parsed page. A median layout-box score under 0.5
+  yields `layout_low_confidence` (`details.layout_score`, `threshold`): the
+  layout model may have left text out, though a dense page of many small blocks
+  can score low and be complete. A `table` or `content` block of 0.25
+  megapixels or more that has far too little text for its size, ends where
+  PaddleX cut a runaway dot leader, or repeats whole rows yields
+  `table_suspect` (`details.block_id`, `block_type`, `reason` `low_density` /
+  `cut_repetition` / `repeated_rows`, `megapixels`, `chars`, `reread`). Areas
+  and the density are measured at 200 dpi and scaled by the page's dpi. With
+  `OCR_TABLE_REREAD` on, `/parse` and `/parse/chunks` ask `PipelineBackend` for a
+  second reading (startup calibration never does): it keeps such a page back, with the
+  pages after it in the same block, until the block's stream ends; it then
+  reads each suspect block once more at two megapixels (a crop within the
+  reader's own limit is enlarged to it) and keeps the second reading only when
+  the same rules are silent on it and it says more than the first. `reread`
+  says what became of the block:
+  - `kept`: the second reading replaced the first in blocks and Markdown, and
+    the warning is `info`. It passed the checks, which makes it usually whole,
+    not surely: of 26 kept readings of looping blocks measured, 4 still found
+    only 80 to 90% of the printed words.
+  - `rejected`: a second reading was made and failed the checks; the first stays.
+  - `skipped`: no second reading was applied. Second readings are made only
+    while more than 60 s of the block's budget are left, that budget being the
+    smaller of the request time left and `OCR_PAGE_TIMEOUT` times the pages of
+    the block; when 60 s are left every page still waiting is delivered with
+    its first reading and a second reading still running is dropped, so no
+    finished page is lost to it. With `OCR_PAGE_TIMEOUT` at 60 s or less a
+    one-page parse is therefore never read twice. A second reading that fails
+    is `skipped` too.
+  - `off`: `OCR_TABLE_REREAD=false`.
+
+  The warnings travel in the response, `json_ocr.json` and `manifest.json` and
+  do not set `partial_ocr`. `json_rag` carries their codes and two page lists,
+  `metadata.low_layout_confidence_pages` and `metadata.suspect_table_pages`
+  (1-based; every page with a flagged block, whatever its `reread`), and
+  nothing else: no chunk is marked or changed, so what an ingester loads is
+  the same with and without flags. A document with no suspect block is parsed,
+  streamed and exported exactly as before.
 - **RAG chunking requires an explicit `options.max_tokens` budget.** In strict mode
   (`strictly: true`), an un-splittable protected table or code block exceeding
   `max_tokens` returns an actionable `422` budget conflict rather than silently
@@ -242,8 +285,14 @@ card under 8 GB with vLLM at the default `OCR_LAYOUT_GPU_MEMORY_MB`, restart
 backend, run `/parse`, `/ocr` or `/parse/chunks` in archive-only mode (they
 answer `503 ocr_disabled_archive_only`; that mode starts without any GPU because
 Paddle loads only on the first inference, which it never admits), process multi-frame TIFF/GIF animations on `/ocr`, exceed configured
-pixel/byte/page budgets without receiving `413`/`422`, or mutate S3 archives
-without the browser role enabled and exact `confirm` strings.
+pixel/byte/page budgets without receiving `413`/`422`, mutate S3 archives
+without the browser role enabled and exact `confirm` strings, or rely on
+`table_suspect` to find every incomplete table: it finds reading loops, not a
+large table read to its end with rows missing. Its sizes assume a known
+resolution: an image input has none and is judged at its native pixels, so a
+scan far from 200 dpi is measured on a different scale. After `repeated_rows`
+any second reading the rules are silent on is accepted, even a shorter one,
+because the loop made the first reading long.
 
 ## Recipes
 
@@ -288,6 +337,7 @@ always include `tests/test_mcp_coverage.py` and `tests/test_mcp_schema.py`.
 | `413 Payload Too Large` on `/parse` or `/ocr` | Check `MAX_FILE_BYTES`, `OCR_MAX_PAGES`, `OCR_PDF_MAX_PAGE_PIXELS`, or `OCR_ELEMENT_MEMORY_BYTES` |
 | `422 Unprocessable Entity` on `/chunk` | Inspect the structured chunking error code (e.g. missing `options.max_tokens` or strict protected-unit overflow) |
 | `503 Service Unavailable` under load | Admission queue (`OCR_MAX_QUEUE_SIZE` or `OCR_ELEMENT_MAX_SLOTS`) is full, or `ChunkRuntime` worker queue timed out |
+| `table_suspect`, or `layout_low_confidence` | The named block or page may be incomplete, most likely with `reread` `rejected`, `skipped` or `off`: compare it with the source. `OCR_TABLE_REREAD=false` turns the second reading off and leaves the warning |
 | `/storage/*` returns `404` or `503` | Confirm `OCR_STORAGE_ENABLED=true`, `OCR_STORAGE_BROWSER_ENABLED=true`, and `OCR_S3_BROWSER_*` credentials are set |
 
 ## Invariants
@@ -300,6 +350,14 @@ always include `tests/test_mcp_coverage.py` and `tests/test_mcp_schema.py`.
 - `ocrserver/chunking/rag.schema.json` and `tests/fixtures/ocr-rag-chunks.schema.json`
   stay synchronized with `ocr_mcp/rag.schema.json`: enforced by
   `tests/test_chunk_contract.py` and `tests/test_chunk_mcp.py`.
+- No reading-quality warning reaches a `json_rag` chunk. `layout_low_confidence`
+  and `table_suspect` live in the response `warnings`, `json_ocr.json`,
+  `manifest.json` and the `json_rag` metadata (codes and two page lists) only;
+  the chunks of a flagged page equal those of the same page unflagged: enforced
+  by `tests/test_parse_quality.py`.
+- `OCR_TABLE_REREAD` has one default, `Settings.table_reread` in `config.py`;
+  `compose.yml` and `.env.example` pass an empty value: enforced by
+  `tests/test_autotune_env_contract.py`.
 
 ## Extending it
 

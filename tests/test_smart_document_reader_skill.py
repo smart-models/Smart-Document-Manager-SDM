@@ -125,6 +125,31 @@ def test_marginal_tags_that_the_chunker_keeps_in_the_body_are_flagged():
         assert "chunker" in rows[tag][-1], tag
 
 
+def test_quality_warnings_are_taught_with_their_reread_outcomes():
+    skill = (SKILL / "SKILL.md").read_text(encoding="utf-8")
+    types = (SKILL / "references/block-types.md").read_text(encoding="utf-8")
+    for text in (skill, types):
+        for rule in (
+            "layout_low_confidence",
+            "table_suspect",
+            "low_layout_confidence_pages",
+            "suspect_table_pages",
+        ):
+            assert rule in text, rule
+    assert "block-types.md" in skill
+    for word in (
+        "`kept`",
+        "`rejected`",
+        "`skipped`",
+        "`off`",
+        "`low_density`",
+        "`cut_repetition`",
+        "`repeated_rows`",
+        "vector store",
+    ):
+        assert word in types, word
+
+
 def test_partial_and_legacy_results_are_covered():
     text = (SKILL / "SKILL.md").read_text(encoding="utf-8")
     for rule in (

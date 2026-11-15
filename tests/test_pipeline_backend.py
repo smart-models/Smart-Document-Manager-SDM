@@ -480,3 +480,458 @@ async def test_abandoned_stream_is_closed_without_running_remaining_pages():
     await backend.aclose(2)
     assert closed.is_set()
     assert "third" not in produced  # the generator was closed, not drained
+
+
+# --- quality: layout score, suspect blocks and their second reading ---
+
+STUB = "<table><tr><td>Unit 1</td><td></td></tr></table>"
+FULL = (
+    "<table>"
+    + "".join(
+        f"<tr><td>Unit {n}</td><td>{n} bears</td><td>July {n}</td></tr>"
+        for n in range(30)
+    )
+    + "</table>"
+)
+PAGE = np.zeros((2200, 1700, 3), dtype=np.uint8)
+TWO_MEGAPIXELS = 2_007_040
+
+
+class PaddleBlock:
+    """What a PaddleOCRVLBlock exposes to the backend."""
+
+    def __init__(self, label, bbox, content):
+        self.label, self.bbox, self.content = label, bbox, content
+
+
+class PaddlePage:
+    """A PaddleX page result: JSON and Markdown are rebuilt on every access."""
+
+    def __init__(self, *blocks, scores=(0.9,)):
+        self.blocks = list(blocks)
+        self.scores = scores
+
+    def __getitem__(self, key):
+        return {"parsing_res_list": self.blocks}[key]
+
+    @property
+    def json(self):
+        return {
+            "res": {
+                "width": 1700,
+                "height": 2200,
+                "layout_det_res": {
+                    "boxes": [{"label": "text", "score": s} for s in self.scores]
+                },
+                "parsing_res_list": [
+                    {
+                        "block_label": block.label,
+                        "block_content": block.content,
+                        "block_bbox": block.bbox,
+                        "block_id": index,
+                        "block_order": index,
+                    }
+                    for index, block in enumerate(self.blocks)
+                ],
+            }
+        }
+
+    @property
+    def markdown(self):
+        return {
+            "markdown_texts": "\n\n".join(block.content for block in self.blocks),
+            "markdown_images": {},
+        }
+
+
+def text_page(text):
+    return PaddlePage(PaddleBlock("text", [0, 0, 100, 100], text))
+
+
+def table_page(content, bbox=(100, 200, 1100, 1200)):
+    return PaddlePage(
+        PaddleBlock("text", [0, 0, 100, 100], "Intro"),
+        PaddleBlock("table", list(bbox), content),
+    )
+
+
+class RereadPipeline:
+    """Stream fixed pages; answer a second reading of a region with ``second``."""
+
+    def __init__(self, pages, second=FULL):
+        self.pages, self.second, self.rereads = pages, second, []
+
+    def predict_iter(self, arrays, **kwargs):
+        yield from self.pages
+
+    def predict(self, crop, **kwargs):
+        self.rereads.append((crop.shape, kwargs))
+        if isinstance(self.second, Exception):
+            raise self.second
+        block = {"block_label": kwargs["prompt_label"], "block_content": self.second}
+        return [SimpleNamespace(json={"res": {"parsing_res_list": [block]}})]
+
+
+def reread_backend(pipeline):
+    return PipelineBackend(Settings(), "http://unused", _pipeline=pipeline)
+
+
+def test_extract_result_reports_layout_score_and_suspect_blocks():
+    page = table_page(STUB)
+    page.scores = (0.31, 0.35, 0.44)
+
+    result = PipelineBackend._extract_result(page)
+
+    assert result["quality"] == {
+        "layout_score": 0.35,
+        "suspects": [
+            {
+                "block_id": 1,
+                "block_type": "table",
+                "reason": "low_density",
+                "megapixels": 1.0,
+                "chars": len(STUB),
+            }
+        ],
+    }
+    scaled = PipelineBackend._extract_result(page, 250)["quality"]["suspects"]
+    assert scaled[0]["megapixels"] == 0.64
+
+
+@pytest.mark.parametrize("layout", [None, [], {"boxes": None}, [{"boxes": []}]])
+def test_extract_result_without_layout_boxes_has_no_score(layout):
+    data = {} if layout is None else {"res": {"layout_det_res": layout}}
+
+    result = PipelineBackend._extract_result(SimpleNamespace(markdown="x", json=data))
+
+    assert result["quality"] == {"layout_score": None, "suspects": []}
+
+
+@pytest.mark.asyncio
+async def test_suspect_table_is_read_again_and_the_kept_reading_replaces_it():
+    pipeline = RereadPipeline([text_page("one"), table_page(STUB), text_page("three")])
+    backend = reread_backend(pipeline)
+    seen = []
+
+    pages = await backend.parse_document(
+        [PAGE] * 3,
+        1,
+        120,
+        600,
+        reread=True,
+        on_page=lambda page: seen.append(page["markdown"]),
+    )
+
+    ((shape, options),) = pipeline.rereads
+    assert shape == (1000, 1000, 3)
+    assert options == {
+        "temperature": 0.0,
+        "use_layout_detection": False,
+        "prompt_label": "table",
+        "min_pixels": TWO_MEGAPIXELS,
+        "max_pixels": TWO_MEGAPIXELS,
+    }
+    assert pages[1]["blocks"][1].content == FULL
+    assert FULL in pages[1]["markdown"] and STUB not in pages[1]["markdown"]
+    assert pages[1]["quality"]["suspects"] == [
+        {
+            "block_id": 1,
+            "block_type": "table",
+            "reason": "low_density",
+            "megapixels": 1.0,
+            "chars": len(STUB),
+            "reread": "kept",
+        }
+    ]
+    assert [page["markdown"] for page in pages][::2] == ["one", "three"]
+    assert seen == [page["markdown"] for page in pages]
+    await backend.aclose(1)
+
+
+@pytest.mark.asyncio
+async def test_large_list_block_is_read_again_as_text_without_enlarging():
+    listing = "\n".join(f"{n} CFR {n}.....{60000 + n}" for n in range(150))
+    page = PaddlePage(PaddleBlock("content", [0, 0, 1500, 1400], "Contents ..."))
+    pipeline = RereadPipeline([page], second=listing)
+    backend = reread_backend(pipeline)
+
+    pages = await backend.parse_document([PAGE], 1, 120, 600, reread=True)
+
+    ((shape, options),) = pipeline.rereads
+    assert shape == (1400, 1500, 3)
+    assert options["prompt_label"] == "ocr"
+    assert options["max_pixels"] == TWO_MEGAPIXELS and "min_pixels" not in options
+    assert pages[0]["blocks"][0].content == listing
+    assert pages[0]["quality"]["suspects"][0]["reason"] == "cut_repetition"
+    await backend.aclose(1)
+
+
+@pytest.mark.asyncio
+async def test_second_reading_that_is_no_better_leaves_the_first():
+    pipeline = RereadPipeline([table_page(STUB)], second=STUB)
+    backend = reread_backend(pipeline)
+
+    pages = await backend.parse_document([PAGE], 1, 120, 600, reread=True)
+
+    assert len(pipeline.rereads) == 1
+    assert pages[0]["blocks"][1].content == STUB
+    assert STUB in pages[0]["markdown"]
+    assert pages[0]["quality"]["suspects"][0]["reread"] == "rejected"
+    await backend.aclose(1)
+
+
+@pytest.mark.asyncio
+async def test_failed_second_reading_keeps_the_page():
+    pipeline = RereadPipeline([table_page(STUB)], second=RuntimeError("vllm"))
+    backend = reread_backend(pipeline)
+
+    pages = await backend.parse_document([PAGE], 1, 120, 600, reread=True)
+
+    assert "error" not in pages[0]
+    assert pages[0]["blocks"][1].content == STUB
+    assert pages[0]["quality"]["suspects"][0]["reread"] == "skipped"
+    await backend.aclose(1)
+
+
+@pytest.mark.asyncio
+async def test_second_reading_is_made_only_on_request():
+    pipeline = RereadPipeline([table_page(STUB)])
+    backend = reread_backend(pipeline)
+
+    pages = await backend.parse_document([PAGE], 1, 120, 600)
+
+    assert pipeline.rereads == []
+    assert pages[0]["blocks"][1].content == STUB
+    assert pages[0]["quality"]["suspects"][0]["reread"] == "off"
+    await backend.aclose(1)
+
+
+@pytest.mark.asyncio
+async def test_second_reading_is_skipped_without_time_left():
+    pipeline = RereadPipeline([table_page(STUB)])
+    backend = reread_backend(pipeline)
+
+    pages = await backend.parse_document([PAGE], 1, 5, 10, reread=True)
+
+    assert pipeline.rereads == []
+    assert pages[0]["blocks"][1].content == STUB
+    assert pages[0]["quality"]["suspects"][0]["reread"] == "skipped"
+    await backend.aclose(1)
+
+
+@pytest.mark.asyncio
+async def test_document_without_suspect_blocks_streams_as_before():
+    delivered = threading.Event()
+    waited = []
+
+    class Pipeline(RereadPipeline):
+        def predict_iter(self, arrays, **kwargs):
+            yield self.pages[0]
+            # The first page reaches the caller before the second is read.
+            waited.append(delivered.wait(2))
+            yield self.pages[1]
+
+    pipeline = Pipeline([text_page("one"), table_page(FULL)])
+    backend = reread_backend(pipeline)
+
+    pages = await backend.parse_document(
+        [PAGE] * 2, 1, 120, 600, reread=True, on_page=lambda page: delivered.set()
+    )
+
+    assert waited == [True]
+    assert pipeline.rereads == []
+    assert [page["quality"]["suspects"] for page in pages] == [[], []]
+    assert pages[1]["blocks"][1].content == FULL
+    await backend.aclose(1)
+
+
+@pytest.mark.asyncio
+async def test_pages_before_a_suspect_one_are_not_held_back():
+    delivered = threading.Event()
+    waited = []
+
+    class Pipeline(RereadPipeline):
+        def predict_iter(self, arrays, **kwargs):
+            yield self.pages[0]
+            waited.append(delivered.wait(2))
+            yield from self.pages[1:]
+
+    pipeline = Pipeline([text_page("one"), table_page(STUB), text_page("three")])
+    backend = reread_backend(pipeline)
+
+    pages = await backend.parse_document(
+        [PAGE] * 3, 1, 120, 600, reread=True, on_page=lambda page: delivered.set()
+    )
+
+    assert waited == [True]
+    assert [page["markdown"].split("\n")[0] for page in pages] == [
+        "one",
+        "Intro",
+        "three",
+    ]
+    await backend.aclose(1)
+
+
+@pytest.mark.asyncio
+async def test_held_pages_are_delivered_when_the_deadline_falls_in_a_stream_gap(
+    monkeypatch,
+):
+    from ocrserver import pipeline_backend
+
+    monkeypatch.setattr(pipeline_backend, "REREAD_SECONDS", 0.4)
+    closed = threading.Event()
+
+    class Pipeline(RereadPipeline):
+        def predict_iter(self, arrays, **kwargs):
+            try:
+                yield self.pages[0]  # suspect: held, 1.2 s are left
+                yield self.pages[1]  # held behind it
+                closed.wait(1.6)  # no third page before the deadline
+            finally:
+                closed.set()
+
+    pipeline = Pipeline([table_page(STUB), text_page("two")])
+    backend = reread_backend(pipeline)
+
+    pages = await backend.parse_document([PAGE] * 3, 1, 0.4, 1.2, reread=True)
+
+    assert ["error" in page for page in pages] == [False, False, True]
+    assert pages[0]["blocks"][1].content == STUB
+    assert pages[0]["quality"]["suspects"][0]["reread"] == "skipped"
+    assert pages[1]["markdown"] == "two"
+    await backend.aclose(3)
+    assert pipeline.rereads == []
+
+
+@pytest.mark.asyncio
+async def test_second_reading_that_outlives_the_budget_costs_no_page(monkeypatch):
+    from ocrserver import pipeline_backend
+
+    monkeypatch.setattr(pipeline_backend, "REREAD_SECONDS", 0.4)
+    finished = threading.Event()
+
+    class Pipeline(RereadPipeline):
+        def predict(self, crop, **kwargs):
+            finished.wait(1.6)  # the second reading runs past the deadline
+            return super().predict(crop, **kwargs)
+
+    pipeline = Pipeline([table_page(STUB), text_page("two"), text_page("three")])
+    backend = reread_backend(pipeline)
+
+    pages = await backend.parse_document([PAGE] * 3, 1, 0.4, 1.2, reread=True)
+
+    assert ["error" in page for page in pages] == [False, False, False]
+    # The late second reading is dropped: the page keeps its first one.
+    assert pages[0]["blocks"][1].content == STUB
+    assert pages[0]["quality"]["suspects"][0]["reread"] == "skipped"
+    assert [page["markdown"] for page in pages[1:]] == ["two", "three"]
+    finished.set()
+    await backend.aclose(3)
+    assert len(pipeline.rereads) == 1
+    assert pages[0]["quality"]["suspects"][0]["reread"] == "skipped"
+
+
+@pytest.mark.asyncio
+async def test_failure_while_applying_a_second_reading_keeps_every_page():
+    class Unwritable(PaddlePage):
+        def __getitem__(self, key):
+            raise KeyError(key)
+
+    flagged = Unwritable(
+        PaddleBlock("text", [0, 0, 100, 100], "Intro"),
+        PaddleBlock("table", [100, 200, 1100, 1200], STUB),
+    )
+    pipeline = RereadPipeline([flagged, text_page("two")])
+    backend = reread_backend(pipeline)
+
+    pages = await backend.parse_document([PAGE] * 2, 1, 120, 600, reread=True)
+
+    assert len(pipeline.rereads) == 1
+    assert ["error" in page for page in pages] == [False, False]
+    assert pages[0]["blocks"][1].content == STUB
+    assert pages[0]["quality"]["suspects"][0]["reread"] == "skipped"
+    assert pages[1]["markdown"] == "two"
+    await backend.aclose(1)
+
+
+@pytest.mark.asyncio
+async def test_page_results_are_kept_only_for_pages_read_again():
+    import gc
+    import weakref
+
+    waiting = []
+    alive = []
+
+    class Pipeline(RereadPipeline):
+        def predict_iter(self, arrays, **kwargs):
+            yield table_page(STUB)
+            page = text_page("two")  # held behind the suspect page
+            waiting.append(weakref.ref(page))
+            yield page
+            del page
+            yield text_page("three")
+
+        def predict(self, crop, **kwargs):
+            gc.collect()
+            alive.append(waiting[0]() is not None)
+            return super().predict(crop, **kwargs)
+
+    pipeline = Pipeline([])
+    backend = reread_backend(pipeline)
+
+    pages = await backend.parse_document([PAGE] * 3, 1, 120, 600, reread=True)
+
+    assert [page["markdown"].split("\n")[0] for page in pages] == [
+        "Intro",
+        "two",
+        "three",
+    ]
+    # The PaddleX result of a page with nothing to read again was let go.
+    assert alive == [False]
+    await backend.aclose(1)
+
+
+@pytest.mark.asyncio
+async def test_pages_held_for_a_second_reading_survive_a_failing_stream():
+    class Pipeline(RereadPipeline):
+        def predict_iter(self, arrays, **kwargs):
+            yield self.pages[0]
+            raise RuntimeError("vllm went away")
+
+    pipeline = Pipeline([table_page(STUB)])
+    backend = reread_backend(pipeline)
+
+    pages = await backend.parse_document([PAGE] * 2, 1, 120, 600, reread=True)
+
+    assert "error" not in pages[0] and pages[0]["blocks"][1].content == STUB
+    assert pages[0]["quality"]["suspects"][0]["reread"] == "skipped"
+    assert "vllm went away" in pages[1]["error"]
+    assert pipeline.rereads == []
+    await backend.aclose(1)
+
+
+@pytest.mark.asyncio
+async def test_departed_caller_gets_no_second_reading():
+    yielded = threading.Event()
+    departed = threading.Event()
+
+    class Pipeline(RereadPipeline):
+        def predict_iter(self, arrays, **kwargs):
+            yield self.pages[0]  # suspect: held for a second reading
+            yielded.set()
+            departed.wait(5)  # the stream ends only after the caller left
+
+    pipeline = Pipeline([table_page(STUB)])
+    backend = reread_backend(pipeline)
+
+    call = asyncio.ensure_future(
+        backend.parse_document([PAGE] * 2, 1, 120, 600, reread=True)
+    )
+    assert await asyncio.to_thread(yielded.wait, 5)
+    call.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await call
+    departed.set()
+
+    await backend.aclose(5)
+    assert pipeline.rereads == []

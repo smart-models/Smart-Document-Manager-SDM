@@ -580,3 +580,90 @@ async def test_no_tool_schema_suggests_a_container_mount():
     async with harness(successful) as (client, _):
         tools = (await client.list_tools()).tools
     assert all("/inputs" not in json.dumps(tool.input_schema) for tool in tools)
+
+
+QUALITY_WARNINGS = [
+    {
+        "code": "layout_low_confidence",
+        "severity": "warning",
+        "message": "Page 2: the layout was detected with low confidence.",
+        "target": {"field": "page", "index": 1},
+        "details": {"layout_score": 0.34, "threshold": 0.5},
+    },
+    {
+        "code": "table_suspect",
+        "severity": "warning",
+        "message": "Page 3, block 4 (table): the reading looks cut short.",
+        "target": {"field": "page", "index": 2},
+        "details": {
+            "block_id": 4,
+            "block_type": "table",
+            "reason": "cut_repetition",
+            "megapixels": 1.2,
+            "chars": 150,
+            "reread": "rejected",
+        },
+    },
+    {
+        "code": "table_suspect",
+        "severity": "info",
+        "message": "Page 5, block 2 (table): a second reading replaced it.",
+        "target": {"field": "page", "index": 4},
+        "details": {
+            "block_id": 2,
+            "block_type": "table",
+            "reason": "low_density",
+            "megapixels": 0.8,
+            "chars": 90,
+            "reread": "kept",
+        },
+    },
+]
+
+
+def parse_upstream(payload):
+    def upstream(request):
+        if request.url.path == "/health":
+            return httpx.Response(200, json=HEALTH)
+        assert request.url.path == "/parse"
+        return httpx.Response(200, json=payload)
+
+    return upstream
+
+
+async def test_parse_text_names_the_json_rag_pages_to_check_before_ingest():
+    metadata = {"low_layout_confidence_pages": [2], "suspect_table_pages": [3]}
+    flagged = {
+        **PARSE,
+        "warnings": QUALITY_WARNINGS,
+        "json_rag": {"chunks": [], "metadata": metadata},
+    }
+    async with harness(parse_upstream(flagged)) as (client, _calls):
+        result = await client.call_tool(
+            "ocr_parse_document", {"params": {"image_base64": PNG, "json_rag": True}}
+        )
+
+    assert result.structured_content == flagged
+    text = result.content[0].text
+    assert "WARNING layout_low_confidence: Page 2" in text
+    assert "WARNING table_suspect: Page 3, block 4" in text
+    assert "json_rag pages with low layout confidence**: 1 page: 2" in text
+    assert "json_rag pages with a suspect table or list**: 1 page: 3" in text
+    assert "carry no mark" in text
+
+
+async def test_parse_text_is_silent_about_json_rag_pages_when_none_is_flagged():
+    clean = {
+        **PARSE,
+        "json_rag": {
+            "chunks": [],
+            "metadata": {"low_layout_confidence_pages": [], "suspect_table_pages": []},
+        },
+    }
+    async with harness(parse_upstream(clean)) as (client, _calls):
+        result = await client.call_tool(
+            "ocr_parse_document", {"params": {"image_base64": PNG, "json_rag": True}}
+        )
+
+    assert "json_rag pages" not in result.content[0].text
+    assert "carry no mark" not in result.content[0].text

@@ -95,6 +95,29 @@ def test_skill_body_is_concise():
     assert len(body.split()) <= 1350
 
 
+def test_quality_warnings_and_unmarked_chunks_are_taught():
+    skill = (SKILL / "SKILL.md").read_text(encoding="utf-8")
+    reference = (SKILL / "references/reference.md").read_text(encoding="utf-8")
+    playbooks = (SKILL / "references/playbooks.md").read_text(encoding="utf-8")
+    for text in (skill, reference, playbooks):
+        for rule in ("layout_low_confidence", "table_suspect", "vector"):
+            assert rule in text, rule
+    for text in (skill, reference):
+        for rule in ("low_layout_confidence_pages", "suspect_table_pages"):
+            assert rule in text, rule
+    for word in (
+        "`kept`",
+        "`rejected`",
+        "`skipped`",
+        "`off`",
+        "`low_density`",
+        "`cut_repetition`",
+        "`repeated_rows`",
+        "OCR_TABLE_REREAD",
+    ):
+        assert word in reference, word
+
+
 def test_stored_document_questions_route_by_file_and_size():
     skill = (SKILL / "SKILL.md").read_text(encoding="utf-8")
     playbooks = (SKILL / "references/playbooks.md").read_text(encoding="utf-8")

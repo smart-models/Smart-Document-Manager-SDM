@@ -77,6 +77,10 @@ class Settings:
     layout_threads: int | None = None
     vl_max_inflight: int = 16
     vl_max_num_seqs: int = 16
+    # Read a table or list block again when ocrserver.quality finds a reading
+    # loop in it. This is the only place the default is set: Compose and
+    # .env.example pass an empty value through.
+    table_reread: bool = True
     vllm_url: str = "http://vllm-paddleocr:8080/v1"
     vllm_served_model: str = "PaddleOCR-VL-0.9B"
     hf_cache_dir: str = ""
@@ -203,6 +207,7 @@ class Settings:
             "storage_save_parsed",
             "storage_browser_enabled",
             "archive_only",
+            "table_reread",
         ):
             if type(getattr(self, name)) is not bool:
                 raise ValueError(f"{name} must be a boolean")
@@ -332,6 +337,7 @@ _ENV_KEYS = {
     "layout_threads": "OCR_LAYOUT_THREADS",
     "vl_max_inflight": "OCR_VL_MAX_INFLIGHT",
     "vl_max_num_seqs": "OCR_VLLM_MAX_NUM_SEQS",
+    "table_reread": "OCR_TABLE_REREAD",
     "vllm_url": "OCR_VLLM_URL",
     "vllm_served_model": "OCR_VLLM_SERVED_MODEL",
     "hf_cache_dir": "OCR_HF_CACHE_DIR",

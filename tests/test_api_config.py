@@ -64,6 +64,16 @@ def test_invalid_environment_is_not_silently_defaulted(key, value):
         load_settings({key: value}, None)
 
 
+def test_table_reread_is_on_unless_the_environment_turns_it_off():
+    assert Settings().table_reread is True
+    assert load_settings({"OCR_TABLE_REREAD": ""}, None).table_reread is True
+    assert load_settings({"OCR_TABLE_REREAD": "false"}, None).table_reread is False
+    with pytest.raises(ValueError):
+        load_settings({"OCR_TABLE_REREAD": "maybe"}, None)
+    with pytest.raises(ValueError):
+        Settings(table_reread="yes")
+
+
 def test_fractional_profile_integer_is_not_truncated():
     with pytest.raises(ValueError, match="vl_lanes"):
         load_settings({}, {"decisions": {"vl_lanes": 1.5}})

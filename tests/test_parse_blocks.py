@@ -76,6 +76,8 @@ class BlockPipeline:
         *,
         close_images=False,
         on_page=None,
+        dpi=None,
+        reread=False,
     ):
         index = len(self.calls)
         self.calls.append(len(images))

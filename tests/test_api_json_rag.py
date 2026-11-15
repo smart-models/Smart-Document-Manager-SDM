@@ -18,7 +18,15 @@ class BlockPipeline(FakePipeline):
     """Emit body and page-number blocks for JSON-RAG API tests."""
 
     async def parse_document(
-        self, images, lanes, page_timeout, timeout, *, close_images=False
+        self,
+        images,
+        lanes,
+        page_timeout,
+        timeout,
+        *,
+        close_images=False,
+        dpi=None,
+        reread=False,
     ):
         pages = await super().parse_document(
             images, lanes, page_timeout, timeout, close_images=close_images

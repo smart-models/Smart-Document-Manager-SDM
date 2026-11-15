@@ -33,6 +33,8 @@ class FakePipeline:
         *,
         close_images=False,
         on_page=None,
+        dpi=None,
+        reread=False,
     ):
         self.calls.append(images)
         if close_images:

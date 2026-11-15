@@ -28,7 +28,11 @@ def register(mcp: MCPServer) -> None:
             "the REST route the error names for a human or REST client to fetch; "
             "no stored result exists. "
             "A parse/chunks output failure "
-            "may require inference again, so never retry it automatically."
+            "may require inference again, so never retry it automatically.\n"
+            "6. Chunks carry no mark for a page the parse warned about. Name the "
+            "pages of its layout_low_confidence and table_suspect warnings to the "
+            "user, whose text may be incomplete, before the chunks are loaded "
+            "into a vector store."
         )
 
     @mcp.prompt(name="ocr_extract_document", title="Extract a document")

@@ -163,6 +163,7 @@ services:
       # Paddle VRAM cap for PP-DocLayoutV3 on the GPU shared with vLLM.
       FLAGS_gpu_memory_limit_mb: ${OCR_LAYOUT_GPU_MEMORY_MB:-3584}
       OCR_VL_MAX_INFLIGHT: ${OCR_VL_MAX_INFLIGHT:-16}
+      OCR_TABLE_REREAD: ${OCR_TABLE_REREAD:-}
       OCR_VLLM_MAX_NUM_SEQS: ${OCR_VLLM_MAX_NUM_SEQS:-16}
       # Optional S3 output archive: run scripts/configure_storage.py to enable.
       OCR_STORAGE_ENABLED: ${OCR_STORAGE_ENABLED:-false}

@@ -457,3 +457,29 @@ async def test_each_tool_call_logs_name_outcome_and_duration_never_arguments():
     assert len(re.findall(r"tool 'ocr_parse_document' error \d+\.\ds", lines)) == 2
     assert PNG not in lines
     assert "invented_option" not in lines
+
+
+def test_server_instructions_name_the_quality_warnings_and_the_page_lists():
+    for name in (
+        "layout_low_confidence",
+        "table_suspect",
+        "low_layout_confidence_pages",
+        "suspect_table_pages",
+    ):
+        assert name in _SERVER_INSTRUCTIONS, name
+
+
+def test_rag_prompt_tells_to_report_flagged_pages_before_a_vector_store_load():
+    from ocr_mcp import prompts
+
+    registered = {}
+
+    class Recorder:
+        def prompt(self, name, title):
+            return lambda function: registered.setdefault(name, function)
+
+    prompts.register(Recorder())
+    text = registered["ocr_prepare_rag"]("document.json", "512")
+
+    for rule in ("layout_low_confidence", "table_suspect", "vector store"):
+        assert rule in text, rule

@@ -127,7 +127,7 @@ are distinct from Compose settings. Tests compare exact names, values and state.
 ## Capabilities and limits
 
 **You can:** open any guide directly over `file://` without a server or network,
-search all 108 `.env.example` settings offline, preview PowerShell and Bash
+search all 109 `.env.example` settings offline, preview PowerShell and Bash
 launcher commands side by side, replay the pipeline and chunking players, try
 the reading-order and budget labs, and print complete unfolded guides.
 

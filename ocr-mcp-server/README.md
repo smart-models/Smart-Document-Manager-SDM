@@ -142,7 +142,10 @@ the package.
 `ocr_parse_document` supports every parse option including `json_rag`.
 `ocr_recognize_image` supports ocr, table, formula, chart, spotting and seal.
 Both return full structured content alongside Markdown or JSON text. Page errors
-and warnings survive. Clients that read structured content (Claude Code) show
+and warnings survive, `layout_low_confidence` and `table_suspect` included; when
+a `json_rag` export names pages in `metadata.low_layout_confidence_pages` or
+`metadata.suspect_table_pages`, the parse text lists them and says that chunks
+carry no mark. Clients that read structured content (Claude Code) show
 that instead of the text, so a JSON presentation is compact. When the client
 sends a progress token, `ocr_parse_document` tags the parse with a
 `progress_id`, polls `/parse/progress/{progress_id}` every two seconds and
@@ -153,6 +156,12 @@ report; a failed poll never changes the result.
 JSON uses `/chunk` without another OCR or model health check; PDF/image/Office input
 uses `/parse/chunks` once. Its complete structured result follows the bundled
 `rag.schema.json`; both text presentations contain only a bounded summary.
+With `parsed_document` or `source_key` that summary also names the pages of the
+parse's `layout_low_confidence` and `table_suspect` warnings (at most the first
+20 of each); the chunks themselves never carry a mark. Document mode has no
+parse to read them from, since `/parse/chunks` returns no parse warnings: with
+storage enabled they are in the archive manifest, otherwise parse first with
+`ocr_parse_document` and chunk that result.
 Sections, exact PaddleOCR counts, table/code protections and strict overflow
 follow the API. On strict conflict, choose a larger budget, allowed splitting,
 or explicitly permissive overflow; the tool never changes options by itself.

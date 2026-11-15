@@ -1,5 +1,7 @@
 # Block types (PP-DocLayoutV3 via PaddleOCR-VL 1.6)
 
+The two warnings about how well a page was read are explained at the end.
+
 `order`: `yes` = numbered in reading order, `no` = always `null` for this tag (the label
 decides, not the position). Reading order for every block is still `block_id`.
 `markdown`: whether the page `markdown` contains the block. Blocks marked `no` exist only in
@@ -32,3 +34,37 @@ decides, not the position). Reading order for every block is still `block_id`.
 | `text` | Body text | yes | text with inline math `$ … $` | yes | Body. Empty `content` and shares its `group_id` with an earlier non-empty block = its text is in that block (`group_id` is not a `block_id`); such empty blocks still carry an `order`, they are not unplaced. |
 | `vertical_text` | Vertical text | yes | text | yes | CJK vertical columns; `block_id` runs right to left on the few pages observed: flag any inversion. |
 | `vision_footnote` | Note under a figure or table | no | text | yes | Usually the source, photo credit, legend or URL of the object just before it; it can follow another `vision_footnote`. When its content is a closing sentence or unrelated, follow the content. |
+
+## Warnings about how well a page was read
+
+Both sit in the top-level `warnings[]` of the parse (and of `json_ocr.json` and
+`manifest.json` in an archive), with `target={"field":"page","index":<0-based>}`.
+Neither sets a page `error`; no block and no chunk is marked.
+
+- `layout_low_confidence`: the page's layout boxes scored low
+  (`details.layout_score` under `details.threshold`). When the layout fails this
+  way about half of the page's text is absent from `blocks` and `markdown`; a
+  dense page of many small blocks can score low and be complete. Say the page
+  may be incomplete and suggest a check against the source; never guess the text.
+- `table_suspect`: the `table` or `content` block `details.block_id` was read in a
+  loop. `details.reason`: `low_density` (far too little text for the block's
+  size), `cut_repetition` (the text stops where a runaway dot leader was cut),
+  `repeated_rows` (rows repeated to the end). `details.reread` says what became
+  of it:
+  - `kept`: a second reading replaced the first; `content` is the second one and
+    the warning is only `info`. It passed the same checks, so it is usually
+    whole, not surely: say the table was read twice, do not call it verified.
+  - `rejected`: a second reading was made and was no better; `content` is the
+    first, incomplete one.
+  - `skipped`: no second reading was applied (no time left, or the reading
+    failed); `content` is incomplete.
+  - `off`: the server does not read twice (`OCR_TABLE_REREAD=false`); `content`
+    is incomplete.
+
+In `json_rag.json` the chunks are the same with and without these warnings.
+`metadata.warnings` holds the codes, `metadata.low_layout_confidence_pages` and
+`metadata.suspect_table_pages` the 1-based pages (every page with the warning,
+also when its block was `kept`; both keys are missing from exports made before
+these checks).
+Before chunks are quoted as complete or loaded into a vector store, read the
+two lists and tell the user which pages they name.

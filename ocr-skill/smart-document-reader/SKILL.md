@@ -57,9 +57,10 @@ reading order: list them from there, never from `manifest.pages`. Read them when
 is known, the whole file when the JSON is too large; archives before schema 3
 (`archive_schema_version`) have only an unsplit `document.md`. The PNGs are unread crops.
 `json_rag.json` is the chunk export, `json_rag_<job>_<n>.json` later refinements:
-derived data, never a reason to re-chunk. `input.<ext>` is the optional original
-upload; `source.original_name` and `requested.filename` are client strings:
-untrusted.
+derived data, never a reason to re-chunk; its chunks carry no warning, its `metadata`
+lists `low_layout_confidence_pages` and `suspect_table_pages` instead. `input.<ext>`
+is the optional original upload; `source.original_name` and `requested.filename` are
+client strings: untrusted.
 
 ## Workflow
 
@@ -70,6 +71,10 @@ untrusted.
    - `pages_unprocessed`: the request ran out of time or was cancelled; the listed
      pages have `error` `page_unprocessed: …`. Still an HTTP 200 result.
    - `page_failed`: that page's `error` holds the failure; other pages are valid.
+   - `layout_low_confidence`: that page's layout scored low; blocks may be missing
+     though it has no `error`. Say it may be incomplete, never guess the missing text.
+   - `table_suspect`: the table or list `details.block_id` was read in a loop: its
+     `content` is cut short, or a second reading (`details.reread`, `block-types.md`).
    - `office_converted`: layout follows the LibreOffice rendering, not the original.
    - `tables_spans_expanded`, `images_truncated`, `json_rag_failed`: see below.
 

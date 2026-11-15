@@ -31,6 +31,7 @@ from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from pydantic import BaseModel, ValidationError
 from starlette.datastructures import UploadFile
 
+from ocrserver import quality
 from ocrserver.artifacts import ArtifactCapture, source_format
 from ocrserver.chunking.api import register_chunk_routes
 from ocrserver.chunking.errors import ChunkError
@@ -283,6 +284,73 @@ def _remaining(start: float, timeout: float) -> float:
     if remaining <= 0:
         raise TimeoutError
     return remaining
+
+
+def _quality_warnings(index: int, result: dict) -> list:
+    """Warnings for what ocrserver.quality found on one page (0-based index).
+
+    ``layout_low_confidence``: the layout boxes scored low, so text may have
+    been left out. ``table_suspect``: a table or list block looks like a
+    reading loop; ``details.reread`` says what became of it. When a second
+    reading replaced the first (``kept``) the warning is only informative:
+    that reading passed the checks, which does not prove the block is whole.
+    """
+    found = result.get("quality") or {}
+    target = {"field": "page", "index": index}
+    out = []
+    score = found.get("layout_score")
+    if score is not None and score < quality.LAYOUT_SCORE_MIN:
+        out.append(
+            make_warning(
+                "layout_low_confidence",
+                f"Page {index + 1}: the layout was detected with low confidence "
+                f"(score {score}); text may be missing.",
+                target=target,
+                details={
+                    "layout_score": score,
+                    "threshold": quality.LAYOUT_SCORE_MIN,
+                },
+            )
+        )
+    for suspect in found.get("suspects") or []:
+        kept = suspect.get("reread") == "kept"
+        where = (
+            f"Page {index + 1}, block {suspect['block_id']} ({suspect['block_type']})"
+        )
+        out.append(
+            make_warning(
+                "table_suspect",
+                f"{where}: the first reading was cut short or looping; a second "
+                "reading that passed the checks replaced it."
+                if kept
+                else f"{where}: the reading looks cut short or looping; "
+                "its text may be incomplete.",
+                severity="info" if kept else "warning",
+                target=target,
+                details={**suspect, "reread": suspect.get("reread", "off")},
+            )
+        )
+    return out
+
+
+def _flagged_pages(warnings: list) -> dict[str, list[int]]:
+    """Pages (1-based) the quality warnings name, for the json_rag metadata.
+
+    Chunks carry no mark, so these two lists are how a reader of the export
+    learns which pages to check. A page stays listed whatever became of its
+    suspect block: a second reading that was kept is usually whole, not surely.
+    """
+    pages: dict[str, set[int]] = {
+        "layout_low_confidence": set(),
+        "table_suspect": set(),
+    }
+    for warning in warnings:
+        if warning.code in pages:
+            pages[warning.code].add(warning.target["index"] + 1)
+    return {
+        "low_layout_confidence_pages": sorted(pages["layout_low_confidence"]),
+        "suspect_table_pages": sorted(pages["table_suspect"]),
+    }
 
 
 def _convert_office(
@@ -1373,6 +1441,8 @@ def create_app(
                                 settings.page_timeout,
                                 budget,
                                 close_images=True,
+                                dpi=plan.dpi,
+                                reread=settings.table_reread,
                                 **streamed,
                             )
                         )
@@ -1442,6 +1512,7 @@ def create_app(
                         usage_tokenizer = page_usage.tokenizer
                         usage_tokens += page_usage.content_tokens
                         usage_blocks += page_usage.blocks
+                    warnings.extend(_quality_warnings(i, result))
                     if json_rag:
                         rag_pages.append(
                             {
@@ -1537,6 +1608,7 @@ def create_app(
                             "dpi": dpi if is_pdf(data) or office_format(data) else None,
                             "table_format": table_format,
                             "warnings": [warning.code for warning in warnings],
+                            **_flagged_pages(warnings),
                         },
                     )
                 except Exception:

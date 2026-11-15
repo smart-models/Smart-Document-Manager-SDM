@@ -8,6 +8,7 @@ from mcp.server import MCPServer
 
 from ocr_mcp.chunk_limits import check_arguments, rag_result
 from ocr_mcp.errors import ToolError, error_result
+from ocr_mcp.formatting import flagged_pages
 from ocr_mcp.inputs import prepare_source
 from ocr_mcp.rag_contract import CreateRagChunksInput, RagToolResult
 from ocr_mcp.responses import validate_payload
@@ -137,6 +138,12 @@ def register(mcp: MCPServer, ctx) -> None:
             Exact complete closed schema is advertised as outputSchema. Metadata
             stays on each chunk, with no metadata wrapper. Token counts include
             repeated titles and headers, using only the PaddleOCR tokenizer.
+            Chunks never carry a mark for a page the parse warned about. With
+            parsed_document or source_key the text summary names the pages of
+            its layout_low_confidence and table_suspect warnings. Document
+            mode returns no parse warnings: with storage enabled read them
+            in the archive manifest, otherwise parse first with
+            ocr_parse_document and chunk that result as parsed_document.
 
         Use when: chunking an archived parse by its json_ocr.json key.
         Use when: converting/rechunking saved OCR JSON without another inference.
@@ -167,6 +174,12 @@ def register(mcp: MCPServer, ctx) -> None:
                 await require_healthy(ctx)
             payload = await ctx.client.chunk_request(path, json=body)
             validate_payload(payload, path)
-            return rag_result(payload, params.response_format, ctx.settings, path)
+            parsed = body.get("parsed_document")
+            flagged = flagged_pages(
+                parsed.get("warnings") if isinstance(parsed, dict) else None
+            )
+            return rag_result(
+                payload, params.response_format, ctx.settings, path, flagged
+            )
         except Exception as exc:
             return error_result(exc)

@@ -113,13 +113,41 @@ no offset. A longer source returns `pages_truncated` with
 `OCR_MAX_EMBEDDED_IMAGE_BYTES` (normally 20971520 bytes) are dropped with
 `images_truncated`. Office input returns the info warning `office_converted`.
 
+Two warnings report how well a page was read, each with
+`target={"field":"page","index":<0-based>}`; neither sets a page `error`:
+
+- `layout_low_confidence`: the page's layout boxes scored low
+  (`details.layout_score` under `details.threshold`, 0.5). When the layout fails
+  this way about half of the page's text is left out; a dense page of many small
+  blocks can also score low and be complete. A reason to check the page.
+- `table_suspect`: a table or list block (`details.block_id`, `block_type`) was
+  read in a loop. `details.reason`: `low_density` (far too little text for its
+  size: `megapixels`, `chars`), `cut_repetition` (the text ends where a runaway
+  dot leader was cut) or `repeated_rows` (rows repeated to the end).
+  `details.reread` says what became of it:
+  - `kept`: a second reading replaced the first and the warning is `info`. It
+    passed the same checks, so it is usually whole, not surely: tell the user
+    the table was read twice.
+  - `rejected`: a second reading was made and was no better; the first stays.
+  - `skipped`: no second reading was applied (the parse was short of time, or
+    the reading failed); the first stays.
+  - `off`: the server runs with `OCR_TABLE_REREAD=false`; the first stays.
+
+  With `rejected`, `skipped` or `off` treat the block's text as incomplete.
+
 The result has `pages`, `model_name`, `pipeline_version`, `processing_time_ms`,
 `warnings`, `usage` and `json_rag`. `usage` (`tokenizer`, `content_tokens`,
 `blocks`) counts parsed block content, not model inference, and is null when
 counting is unavailable. `json_rag` is null unless requested; a failed export
 stays null with `json_rag_failed`; its chunk `id`s start at 1, the chunk tool's
 at 0. It is a different format from
-`ocr_create_rag_chunks` output.
+`ocr_create_rag_chunks` output. `json_rag.metadata` repeats the warning codes
+(`warnings`) and names pages: `failed_pages`, `unprocessed_pages`,
+`low_layout_confidence_pages` and `suspect_table_pages` (1-based; every page
+with one of the two warnings above, also when its block was re-read and
+`kept`; both keys are missing from an export made before these checks
+existed). Its chunks carry no mark: read the two lists before loading chunks
+into a vector store.
 
 Each page has `page` (1-based) and nullable `width`, `height` (raster size, the
 coordinate space of `bbox`), `markdown`, `blocks`, `images`, `image_names` and
@@ -147,6 +175,8 @@ HTTP 200 does not mean every page succeeded. Inspect every page and warning:
   page never reached has `error` `page_unprocessed: …`, and one
   `pages_unprocessed` warning lists them in `details.pages`.
 - Error pages have null `width`, `height`, `markdown` and `blocks`.
+- A page without an `error` can still miss text: `layout_low_confidence` and
+  `table_suspect` (see Parsing options and results) name it.
 - A client disconnect during the parse cancels it and skips archiving; a response
   the client refuses after completion changes nothing: the archive exists.
 - When the client sends a progress token, `ocr_parse_document` relays page
@@ -188,6 +218,15 @@ embedding is run. A protected oversized table or code block fails strict mode
 atomically; permissive mode permits only isolated protected overflow. Budget
 errors keep the measured counts and the conflicting option: explain the
 choices, never silently change strictness or drop content.
+
+Chunks carry no mark for a page the parse warned about
+(`layout_low_confidence`, `table_suspect`). With `source_key` or
+`parsed_document` the text summary names those pages
+(`low_layout_confidence_pages`, `suspect_table_pages`); the structured result
+never does. Document mode cannot name them: `/parse/chunks` returns no parse
+warnings. With storage enabled read `warnings` in the archive manifest
+(`ocr_get_storage_archive`); without storage run `ocr_parse_document` first
+and chunk its result as `parsed_document`.
 
 This tool's argument object is capped by `MCP_CHUNK_MAX_ARGUMENT_BYTES`
 (8388608, compact UTF-8, checked again after file/base64 preparation).

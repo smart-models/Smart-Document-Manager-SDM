@@ -185,7 +185,15 @@ class TokenPipeline:
         self.calls = 0
 
     async def parse_document(
-        self, images, lanes, page_timeout, timeout, *, close_images=False
+        self,
+        images,
+        lanes,
+        page_timeout,
+        timeout,
+        *,
+        close_images=False,
+        dpi=None,
+        reread=False,
     ):
         self.calls += 1
         if close_images:
