@@ -15,10 +15,10 @@
   },
   "vllm": {
     "image": "ocr-vllm:0.32.0-security",
-    "image_id": "sha256:997d33d1c4ce0878c518833aa641fa36fe66fb182ce0d46201a718e58a99bc16",
+    "image_id": "sha256:819b12cf00371a60df3cc4f8b332b8636e30fdf5242a48daa8745959eb4f98ca",
     "python": "3.12.3",
     "lock": "vllm-py312-linux.txt",
-    "sha256": "01a6baf3707a4ed077fc1ac7989ed5f771cc8dae14e04b4f3e5d6cc1f481dbb6",
+    "sha256": "f5477eca645835a5db2dd8feca6c9815ebdf4260985fd3079d7e73e409d80e44",
     "base_image": "vllm/vllm-openai:v0.32.0@sha256:befccf0e7e4089aa23926bb6f887a85c0d46c2a99e6de5c5ffdf5cb7957c5b34"
   }
 }

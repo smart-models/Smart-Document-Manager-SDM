@@ -1,4 +1,7 @@
 # Exact transitive security overrides. Add advisory context when introducing a floor.
+# GHSA-vvf4-9x63-8xvv / CVE-2026-128089: excessive memory and CPU use in
+# dnspython message handling; fixed in 2.9.2.
+dnspython==2.9.2
 # GHSA-6q48-6c7w-9gw2 / PYSEC-2026-4320: certifi bundles emSign roots whose
 # intermediate CA keys are compromised; fixed in 2026.10.19.
 certifi==2026.10.19

@@ -1,7 +1,7 @@
 [
   {
     "lock": "vllm-py312-linux.txt",
-    "sha256": "01a6baf3707a4ed077fc1ac7989ed5f771cc8dae14e04b4f3e5d6cc1f481dbb6",
+    "sha256": "f5477eca645835a5db2dd8feca6c9815ebdf4260985fd3079d7e73e409d80e44",
     "package": "setuptools",
     "version": "80.10.2",
     "advisories": [
@@ -11,11 +11,11 @@
     "expires": "2027-01-31",
     "reason": "CVE-2026-59890 affects source-distribution publishing with Unicode-normalizing filesystems (macOS APFS/HFS+). This Linux model server does not build or publish sdists; that operation is absent from its request path. The fix exists only in 83.0.0 and later, with no 80.x backport, while vLLM 0.32.0 requires setuptools <81 on Python 3.12; vLLM 0.33.0 and LMCache 0.5.7.post1, the latest releases on 2026-11-15, keep the same <81 bound, so installing 83 would break the declared requirements of both. Review again if the runtime or its build responsibilities change, or when vLLM or LMCache allow setuptools 83 or later.",
     "source": "https://github.com/pypa/setuptools/security/advisories/GHSA-h35f-9h28-mq5c",
-    "image_id": "sha256:997d33d1c4ce0878c518833aa641fa36fe66fb182ce0d46201a718e58a99bc16"
+    "image_id": "sha256:819b12cf00371a60df3cc4f8b332b8636e30fdf5242a48daa8745959eb4f98ca"
   },
   {
     "lock": "vllm-py312-linux.txt",
-    "sha256": "01a6baf3707a4ed077fc1ac7989ed5f771cc8dae14e04b4f3e5d6cc1f481dbb6",
+    "sha256": "f5477eca645835a5db2dd8feca6c9815ebdf4260985fd3079d7e73e409d80e44",
     "package": "setuptools",
     "version": "80.10.2",
     "advisories": [
@@ -24,11 +24,11 @@
     "expires": "2027-01-31",
     "reason": "The path escape needs Windows: a drive-qualified absolute path in a wheel's namespace_packages.txt makes os.path.join discard the egg directory during setuptools' legacy install_as_egg path. This model server is a Linux image and installs no wheels at runtime. vLLM 0.32.0 requires setuptools <81 on Python 3.12, so the fixed 84.1.0 would break its declared requirements. Review again if the runtime or its build responsibilities change.",
     "source": "https://github.com/pypa/setuptools/security/advisories/GHSA-xmj3-9gf7-h52w",
-    "image_id": "sha256:997d33d1c4ce0878c518833aa641fa36fe66fb182ce0d46201a718e58a99bc16"
+    "image_id": "sha256:819b12cf00371a60df3cc4f8b332b8636e30fdf5242a48daa8745959eb4f98ca"
   },
   {
     "lock": "vllm-py312-linux.txt",
-    "sha256": "01a6baf3707a4ed077fc1ac7989ed5f771cc8dae14e04b4f3e5d6cc1f481dbb6",
+    "sha256": "f5477eca645835a5db2dd8feca6c9815ebdf4260985fd3079d7e73e409d80e44",
     "package": "opentelemetry-api",
     "version": "1.40.0",
     "advisories": [
@@ -37,6 +37,6 @@
     "expires": "2027-01-31",
     "reason": "CVE-2026-114603 is reached through TraceState.from_header when a W3C propagator extracts an inbound tracestate header. In vLLM 0.32.0 that extraction (vllm/tracing/otel.py extract_trace_context) runs only when --otlp-traces-endpoint is set; build_vllm_command never passes it or --tool-server and accepts no extra arguments, and no ASGI OpenTelemetry instrumentation is installed or registered. LMCache 0.5.6, the latest release in the base image, requires opentelemetry-api<=1.40.0, so the fixed 1.45.1 would break its declared requirements. Review again if tracing is enabled or LMCache allows a fixed release.",
     "source": "https://github.com/open-telemetry/opentelemetry-python/security/advisories/GHSA-xcq7-p3pf-p88h",
-    "image_id": "sha256:997d33d1c4ce0878c518833aa641fa36fe66fb182ce0d46201a718e58a99bc16"
+    "image_id": "sha256:819b12cf00371a60df3cc4f8b332b8636e30fdf5242a48daa8745959eb4f98ca"
   }
 ]
