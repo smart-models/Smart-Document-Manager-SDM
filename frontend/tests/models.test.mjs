@@ -135,7 +135,9 @@ test("recognizes Office documents for parsing but not recognition", () => {
     }),
     true,
   );
-  for (const name of ["a.pdf", "a.png", "a.zip", "a.exe", "docx"]) {
+  // The extension must follow a literal dot: "notes_docx" or "slidesppt" are
+  // not Office files even though their last letters spell an extension.
+  for (const name of ["a.pdf", "a.png", "a.zip", "a.exe", "docx", "notes_docx", "slidesppt"]) {
     assert.equal(isOfficeUpload({ name, type: "" }), false, name);
   }
   const docx = { name: "report.docx", type: "", size: 100 };

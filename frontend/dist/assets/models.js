@@ -61,7 +61,10 @@ export function isPdfUpload(file) {
 export const OFFICE_EXTENSIONS = [
   "docx", "doc", "pptx", "ppt", "xlsx", "xls", "odt", "odp", "ods",
 ];
-const OFFICE_NAME = new RegExp(`\.(${OFFICE_EXTENSIONS.join("|")})$`, "i");
+// The backslash is doubled because a template literal turns "\." into a bare
+// "." (any character) before RegExp ever sees it; "\\." reaches the pattern as
+// an escaped, literal dot, so "notes_docx" is not taken for "notes.docx".
+const OFFICE_NAME = new RegExp(`\\.(${OFFICE_EXTENSIONS.join("|")})$`, "i");
 const OFFICE_TYPE =
   /^application\/(msword|vnd\.ms-(excel|powerpoint)|vnd\.openxmlformats-officedocument\.|vnd\.oasis\.opendocument\.(text|presentation|spreadsheet)$)/;
 

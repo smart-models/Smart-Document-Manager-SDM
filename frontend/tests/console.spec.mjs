@@ -598,6 +598,27 @@ test("rich Markdown rejects executable URLs, event attributes, clobbering and de
   expect(await page.evaluate(() => window.__xss)).toBeUndefined();
 });
 
+test("formula output with trailing text keeps recognized-output rules", async ({ page }) => {
+  await openHealthyConsole(page);
+  // A formula followed by more text falls back to Markdown rendering. It is
+  // still model output of one image: raw HTML shows literally and a remote
+  // image never loads (no outbound request driven by a crafted picture).
+  const result = '$x^2$ and <img src="http://example.invalid/pixel.png" alt="pixel"> <script>window.__xss=true</script>';
+  const remote = [];
+  page.on("request", request => { if (request.url().includes("example.invalid")) remote.push(request.url()); });
+  await page.route("**/ocr", route => route.fulfill({ json: { ...OCR, task: "formula", result } }));
+  await page.locator("#tab-ocr").click();
+  await page.locator("#ocr-task").selectOption("formula");
+  await page.locator("#ocr-file").setInputFiles(IMAGE);
+  await page.locator("#ocr-run").click();
+  const preview = page.locator("#ocr-results .formula-preview");
+  await expect(preview).toContainText("<script>window.__xss=true</script>");
+  await expect(preview.locator(".katex, math").first()).toBeAttached();
+  await expect(page.locator('#ocr-results img[src^="http"]')).toHaveCount(0);
+  expect(remote).toEqual([]);
+  expect(await page.evaluate(() => window.__xss)).toBeUndefined();
+});
+
 test("monitor baselines survive independent counter resets and detect process restarts", async ({ page }) => {
   await page.clock.install();
   await openHealthyConsole(page);

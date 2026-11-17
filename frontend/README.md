@@ -49,7 +49,7 @@ as native ES modules and baked into the `ocr-api` image (`/app/frontend/dist`).
 | `dist/assets/storage.js` | S3 archive browser (loads every cursor page once, then sorts, searches and pages locally), download, confirmation-gated deletion UI, and the `archivePages` listing walk shared with the RAG tab | Storage tab behavior changes |
 | `dist/assets/style.css`, `ocr.css`, `rag.css`, `storage.css` | Console stylesheets | Console visual styling or responsive layout changes |
 | `dist/assets/fonts/`, `dist/assets/vendor/` | Self-hosted WOFF2 fonts and vendored KaTeX, Marked, DOMPurify, and PDF.js | Vendored library versions change (update `verify_frontend_assets.py` together) |
-| `tests/*.test.mjs` | 8 Node unit test files (`models`, `monitor-validation`, `playwright-config`, `rag-names`, `rag-partition`, `rag-preflight`, `rag-repair`, `rag-structure`) | Pure JS logic in `dist/assets/` changes |
+| `tests/*.test.mjs` | 10 Node unit test files (`models`, `monitor-validation`, `parse-progress`, `playwright-config`, `rag-names`, `rag-partition`, `rag-preflight`, `rag-repair`, `rag-structure`, `ui`) | Pure JS logic in `dist/assets/` changes |
 | `tests/*.spec.mjs` | 9 mocked Playwright specs (`api`, `audit-console`, `compliance`, `console`, `info-style-console`, `math`, `monitor-console`, `rag`, `storage`) + 5 `*-live.spec.mjs` specs (`live`, `model-alignment-live`, `rag-repair-live`, `storage-live`, `corpus-live`) | Console DOM, accessibility, or API integration changes |
 | `tests/testbook/` | E2E acceptance book (`test-book-e2e.md`) and disposition registry (`coverage-contract.json`) mapping every case ID to its executable layer | Any console feature, live-only boundary, or coverage gap changes |
 | `tests/testbook/documents/` | Live document corpus: 9 verbatim PaddleOCR `tests/test_files` (Apache-2.0) + 4 files from `generate.py`; `manifest.json` holds origin, SHA-256 and oracle strings read by `corpus-live.spec.mjs` | A live case needs a new document, or the upstream pin changes |
@@ -63,7 +63,7 @@ Run all commands from `frontend/`:
 
 | Command | Runner | Stack required? | Purpose |
 |---|---|---|---|
-| `npm test` | `node --test tests/*.test.mjs` | No | Fast pure-JS unit tests (131 assertions) |
+| `npm test` | `node --test tests/*.test.mjs` | No | Fast pure-JS unit tests (151 tests, including the testbook coverage gate) |
 | `npm run test:e2e` | `playwright test --project=mock` | No | Browser E2E suite against `tests/static-server.mjs` and mocked API routes |
 | `npx --no-install playwright test --config playwright.guides.config.js` | Playwright (`guide-tests/`) | No | Offline `file://` verification of `../guide/*.html` across 320–1440px, print, and no-JS |
 | `npm run test:live` | `playwright test --project=live` | **Yes** (`OCR_UI_BASE_URL`) | Live browser verification against a running stack |

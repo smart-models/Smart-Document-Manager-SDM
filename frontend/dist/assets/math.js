@@ -156,6 +156,9 @@ export function renderMarkdown(markdown, { recognized = false } = {}) {
 export function renderFormula(source) {
   const trimmed = source.trim();
   const token = mathToken(trimmed);
-  if (token && token.raw.length !== trimmed.length) return renderMarkdown(source);
+  // A formula with surrounding text falls back to Markdown. The source is
+  // still model output of one image, so the recognized-output rules apply:
+  // raw HTML shows literally and remote images never load.
+  if (token && token.raw.length !== trimmed.length) return renderMarkdown(source, { recognized: true });
   return formulaNode(token ? token.latex : trimmed, source, true).outerHTML;
 }

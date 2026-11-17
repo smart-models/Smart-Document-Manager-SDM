@@ -144,13 +144,18 @@ export function keepFocus(control, fallback) {
 }
 
 /** HTML-escape a value for interpolation into an innerHTML template.
-    Every helper below goes through it; so must your app.js templates. */
+    Every helper below goes through it; so must your app.js templates.
+    Both quote characters are encoded, so the result is safe in element text
+    and in double- or single-quoted attributes. Global regex replaces are
+    used on purpose: they behave like replaceAll here, and they are the form
+    static analysers (CodeQL) recognise as an HTML escaper. */
 export function esc(value) {
   return String(value)
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;');
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 /** Alert markup. `type` is "" or "error". Theme convention: messages
