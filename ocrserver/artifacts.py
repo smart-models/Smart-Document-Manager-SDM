@@ -14,7 +14,7 @@ from ocrserver.archive_names import parse_prefix, safe_filename
 from ocrserver.chunking.types import VERSION as CHUNKER_VERSION
 from ocrserver.config import Settings
 from ocrserver.pdf_utils import is_pdf
-from ocrserver.schemas import MODEL_NAME, PIPELINE_VERSION
+from ocrserver.schemas import APP_VERSION, MODEL_NAME, PIPELINE_VERSION
 
 
 class ArchiveLimit(ValueError):
@@ -486,7 +486,7 @@ def _build_archive(capture, result, prefix, parsed, result_bytes):
         "model_revision": settings.vllm_model_revision,
         "served_model": settings.vllm_served_model,
         "pipeline_version": PIPELINE_VERSION,
-        "application_version": "1.0.0",
+        "application_version": APP_VERSION,
         "chunker_version": CHUNKER_VERSION if capture.kind == "parse-chunks" else None,
         "processing_time_ms": source_result.processing_time_ms,
         "timings": {

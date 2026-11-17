@@ -27,7 +27,8 @@ RUN pip install --upgrade pip==26.2.1 setuptools==84.2.1 \
 # OCR API runtime.
 FROM python:3.11-slim-bookworm@sha256:a36c24f9cbdf4fd0f52d67f0823eeac19c2028c637cecc392d97f980d4fec56b AS ocr-api
 
-ARG SMART_DOCUMENT_MANAGER_VERSION=1.0.0
+# Must equal APP_VERSION in ocrserver/schemas.py (tests/test_release_version.py).
+ARG SMART_DOCUMENT_MANAGER_VERSION=1.0.1
 LABEL org.opencontainers.image.title="ocr-api" \
       org.opencontainers.image.description="Smart Document Manager FastAPI server (PaddleOCR-VL-1.6 via vLLM)" \
       org.opencontainers.image.version="${SMART_DOCUMENT_MANAGER_VERSION}"
@@ -87,6 +88,7 @@ CMD ["python3", "autotune_entrypoint.py"]
 # MCP server runtime.
 FROM python:3.11-slim-bookworm@sha256:a36c24f9cbdf4fd0f52d67f0823eeac19c2028c637cecc392d97f980d4fec56b AS ocr-mcp
 
+# Must equal ocr_mcp.__version__ (tests/test_release_version.py).
 ARG SMART_DOCUMENT_MANAGER_VERSION=1.0.0
 LABEL org.opencontainers.image.title="personal-smart-ocr-mcp" \
       org.opencontainers.image.description="MCP server exposing Smart Document Manager" \

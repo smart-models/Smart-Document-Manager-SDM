@@ -75,6 +75,7 @@ from ocrserver.pdf_utils import (
 from ocrserver.pipeline_backend import PipelineBackend
 from ocrserver.progress import ProgressEntry, ProgressRegistry, parse_progress_id
 from ocrserver.schemas import (
+    APP_VERSION,
     ELEMENT_TASKS,
     MODEL_NAME,
     PIPELINE_VERSION,
@@ -98,7 +99,6 @@ from ocrserver.token_count import ContentTokenCounter
 from ocrserver.vllm_client import BackendUnavailable, CircuitBreaker, VllmClient
 
 logger = logging.getLogger(__name__)
-APP_VERSION = "1.0.0"
 PUBLIC_AUTH_PATHS = {
     "/",
     "/health",

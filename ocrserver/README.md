@@ -345,6 +345,12 @@ always include `tests/test_mcp_coverage.py` and `tests/test_mcp_schema.py`.
 - Every public route in `ocr_server.py` is either mapped in
   `ocr_mcp/tool_map.py` or explicitly listed as non-tool surface: enforced by
   `tests/test_mcp_coverage.py`.
+- `APP_VERSION` in `ocrserver/schemas.py` is the only definition of the `ocr-api`
+  release version: `/health`, the OpenAPI document, the `ocr_server_info` metric
+  and archive manifests (`application_version`) read it, and the `ocr-api` stage
+  `SMART_DOCUMENT_MANAGER_VERSION` default in the `Dockerfile` must equal it:
+  enforced by `tests/test_release_version.py`. Changing it changes the autotune
+  `source_digest`, so the next start after the upgrade recalibrates once.
 - Model revision default `DEFAULT_MODEL_REVISION` (`c5630abae1d940eafe0697512a0325494b02ab42`)
   in `ocrserver/autotune/tiers.py` matches `compose.yml` and `.env.example`.
 - `ocrserver/chunking/rag.schema.json` and `tests/fixtures/ocr-rag-chunks.schema.json`

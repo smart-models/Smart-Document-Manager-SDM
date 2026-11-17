@@ -19,6 +19,12 @@ from pydantic import (
     model_validator,
 )
 
+# Release version of the ocr-api service, the one place it is defined. It is
+# reported by /health, the OpenAPI document, the ocr_server_info metric and
+# every archive manifest ("application_version"); the ocr-api image label in
+# the Dockerfile must match it (tests/test_release_version.py). Editing it
+# changes the autotune source digest, so the next start recalibrates once.
+APP_VERSION = "1.0.1"
 MODEL_NAME = "PaddlePaddle/PaddleOCR-VL-1.6"
 PIPELINE_VERSION = "v1.6"
 ELEMENT_TASKS = ("ocr", "table", "formula", "chart", "spotting", "seal")
