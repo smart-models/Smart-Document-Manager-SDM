@@ -481,6 +481,7 @@ Things that have already cost time here.
 |---|---|
 | `README.md` | The human operator's entry point and API/benchmark reference. |
 | `LICENSE` | Repository license (GNU AGPL v3). |
+| `SECURITY.md` | Vulnerability reporting policy: supported versions, the private GitHub reporting route, response targets and scope. |
 | `.env.example` | The exhaustive, versioned configuration template. |
 | `pyproject.toml` | Unified Ruff lint/format and pytest configuration. |
 | `scripts/README.md` | The cross-platform launcher and verifier reference. |
