@@ -289,6 +289,9 @@
       .section-heading { grid-template-columns: 1.2fr 1fr; align-items: end; gap: 18px 45px; }
       .section-heading .section-index { grid-column: 1 / -1; }
       .section-heading p { justify-self: end; padding-bottom: 3px; }
+    }
+    /* Three credential columns need room for names such as OCR_SERVER_API_TOKENS. */
+    @media (min-width: 1100px) {
       .credential-map--three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     }
     @media (max-width: 959px) {

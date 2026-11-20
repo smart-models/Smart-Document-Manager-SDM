@@ -163,7 +163,7 @@ by aggregate `CI`. Release evidence requires `guides.log` and `guides.xml`.
 |---|---|
 | Navigation | Header/footer, current page, brand return, hash reveal and back/forward |
 | Keyboard | Skip link, visible focus, native disclosures and labeled controls |
-| Layout | All content at 320, 390, 768 and 1440 pixels; browser zoom at 200% |
+| Layout | All content at 320, 390, 768, 960, 1024 and 1440 pixels; browser zoom at 200% |
 | Players | Stage tabs, transport buttons, timeline `aria-valuetext`, reduced-motion pause, `#scene-N` fragments, `read-story` without JavaScript |
 | Walkthrough | Step nav, "Step n of 6", print reveals all six and restores the active one |
 | Labs | Sample/document switch, furniture filter, relation markers, budget slider, protected unit invariant, overlap markers |

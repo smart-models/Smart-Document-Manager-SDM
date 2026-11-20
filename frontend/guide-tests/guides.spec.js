@@ -57,7 +57,7 @@ for (const name of pages) {
       await expect(target).toHaveAttribute('open', '');
     });
 
-    for (const width of [320, 390, 768, 1440]) {
+    for (const width of [320, 390, 768, 960, 1024, 1440]) {
       test(`all content reflows at ${width}px`, async ({ page }) => {
         await page.setViewportSize({ width, height: 900 });
         await page.evaluate(() => document.querySelectorAll('details').forEach(item => { item.open = true; }));
