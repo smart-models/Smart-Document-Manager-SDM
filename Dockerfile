@@ -94,7 +94,7 @@ CMD ["python3", "autotune_entrypoint.py"]
 FROM python:3.11-slim-bookworm@sha256:a36c24f9cbdf4fd0f52d67f0823eeac19c2028c637cecc392d97f980d4fec56b AS ocr-mcp
 
 # Must equal ocr_mcp.__version__ (tests/test_release_version.py).
-ARG SMART_DOCUMENT_MANAGER_VERSION=1.0.0
+ARG SMART_DOCUMENT_MANAGER_VERSION=1.0.2
 LABEL org.opencontainers.image.title="personal-smart-ocr-mcp" \
       org.opencontainers.image.description="MCP server exposing Smart Document Manager" \
       org.opencontainers.image.version="${SMART_DOCUMENT_MANAGER_VERSION}" \
