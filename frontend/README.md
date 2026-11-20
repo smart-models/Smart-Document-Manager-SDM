@@ -35,9 +35,13 @@ as native ES modules and baked into the `ocr-api` image (`/app/frontend/dist`).
      against `OCR_UI_BASE_URL` on a live stack.
 3. **Offline guide tests (`playwright.guides.config.js`) open `file://` URLs**
    and fail immediately if any `http:` or `https:` network request is attempted.
-4. **Vendored frontend assets are hash-verified.** KaTeX, Marked, DOMPurify,
-   PDF.js, and WOFF2 fonts under `dist/assets/vendor/` and `dist/assets/fonts/`
-   are verified by `scripts/verify_frontend_assets.py`.
+4. **Vendored frontend assets are hash-verified and ship their licences.**
+   KaTeX (including its fonts), Marked, DOMPurify and PDF.js under
+   `dist/assets/vendor/` are verified by `scripts/verify_frontend_assets.py`
+   against `vendor-manifest.json`, where every file names its licence text in
+   `license_file`. The console's own WOFF2 fonts under `dist/assets/fonts/` ship
+   `FONT-LICENSES.txt`, kept equal to `guide/FONT-LICENSES.txt` by
+   `tests/test_third_party_notices.py`. The root `NOTICE` lists them all.
 
 ## Map of the code
 
@@ -48,7 +52,7 @@ as native ES modules and baked into the `ocr-api` image (`/app/frontend/dist`).
 | `dist/assets/rag.js`, `rag-names.js`, `rag-partition.js`, `rag-preflight.js`, `rag-repair.js`, `rag-selection.js`, `rag-storage.js`, `rag-structure.js` | Client-side RAG workspace: chunk inspection, preflight, section structure, and manual split/refine workflows | RAG tab behavior or client-side chunk helpers change |
 | `dist/assets/storage.js` | S3 archive browser (loads every cursor page once, then sorts, searches and pages locally), download, confirmation-gated deletion UI, and the `archivePages` listing walk shared with the RAG tab | Storage tab behavior changes |
 | `dist/assets/style.css`, `ocr.css`, `rag.css`, `storage.css` | Console stylesheets | Console visual styling or responsive layout changes |
-| `dist/assets/fonts/`, `dist/assets/vendor/` | Self-hosted WOFF2 fonts and vendored KaTeX, Marked, DOMPurify, and PDF.js | Vendored library versions change (update `verify_frontend_assets.py` together) |
+| `dist/assets/fonts/`, `dist/assets/vendor/` | Self-hosted WOFF2 fonts and vendored KaTeX, Marked, DOMPurify, and PDF.js, each beside its licence text | Vendored library versions change (update `vendor-manifest.json`, the licence texts and `NOTICE` together) |
 | `tests/*.test.mjs` | 10 Node unit test files (`models`, `monitor-validation`, `parse-progress`, `playwright-config`, `rag-names`, `rag-partition`, `rag-preflight`, `rag-repair`, `rag-structure`, `ui`) | Pure JS logic in `dist/assets/` changes |
 | `tests/*.spec.mjs` | 9 mocked Playwright specs (`api`, `audit-console`, `compliance`, `console`, `info-style-console`, `math`, `monitor-console`, `rag`, `storage`) + 5 `*-live.spec.mjs` specs (`live`, `model-alignment-live`, `rag-repair-live`, `storage-live`, `corpus-live`) | Console DOM, accessibility, or API integration changes |
 | `tests/testbook/` | E2E acceptance book (`test-book-e2e.md`) and disposition registry (`coverage-contract.json`) mapping every case ID to its executable layer | Any console feature, live-only boundary, or coverage gap changes |
@@ -169,7 +173,7 @@ in the `guides` job (`.github/workflows/ci.yml`).
 
 | Symptom | Next check |
 |---|---|
-| `verify_frontend_assets.py` fails | Check for missing or modified files under `dist/assets/vendor/` or `dist/assets/fonts/` |
+| `verify_frontend_assets.py` fails | Check for missing or modified files under `dist/assets/vendor/`, or a `license_file` that is not itself listed in `vendor-manifest.json` |
 | `npm test` fails in `rag-workflows.mjs` | Verify `../tests/fixtures/ocr-rag-chunks.*.json` fixtures exist and match expected schema |
 | Browser changes do not appear on `http://127.0.0.1:8020` | Rebuild `ocr-api` with `stack.* up` (`frontend/dist/` is copied into the image at build time) |
 | Port `8129` already in use during `test:e2e` | Stop any stale `node tests/static-server.mjs` process (`reuseExistingServer` is `false` for hermeticity) |
@@ -180,7 +184,8 @@ in the `guides` job (`.github/workflows/ci.yml`).
 - `tests/playwright-config.test.mjs` enforces that default Playwright runs never
   collect `*-live.spec.mjs` specs.
 - `scripts/verify_frontend_assets.py` (tested by `tests/test_frontend_assets.py`)
-  enforces exact SHA-256 parity for all vendored frontend assets.
+  enforces exact SHA-256 parity for all vendored frontend assets, and that
+  each one names a listed licence text.
 
 ## Extending it
 

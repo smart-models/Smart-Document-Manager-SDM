@@ -31,7 +31,8 @@ FROM python:3.11-slim-bookworm@sha256:a36c24f9cbdf4fd0f52d67f0823eeac19c2028c637
 ARG SMART_DOCUMENT_MANAGER_VERSION=1.0.1
 LABEL org.opencontainers.image.title="ocr-api" \
       org.opencontainers.image.description="Smart Document Manager FastAPI server (PaddleOCR-VL-1.6 via vLLM)" \
-      org.opencontainers.image.version="${SMART_DOCUMENT_MANAGER_VERSION}"
+      org.opencontainers.image.version="${SMART_DOCUMENT_MANAGER_VERSION}" \
+      org.opencontainers.image.licenses="AGPL-3.0-only"
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -70,10 +71,14 @@ COPY --chown=appuser:appuser storage/ ./storage/
 COPY --chown=appuser:appuser vllm/ ./vllm/
 COPY --chown=appuser:appuser calibration/ ./calibration/
 COPY --chown=appuser:appuser frontend/dist/ ./frontend/dist/
+# LICENSE and NOTICE travel with the code; NOTICE points at the third-party
+# licence texts under frontend/dist/ and calibration/fonts/.
 COPY --chown=appuser:appuser \
     ocr_server.py \
     autotune_entrypoint.py \
     benchmark.py \
+    LICENSE \
+    NOTICE \
     ./
 
 RUN mkdir -p /app/model_cache/autotune && chown -R appuser:appuser /app/model_cache
@@ -92,7 +97,8 @@ FROM python:3.11-slim-bookworm@sha256:a36c24f9cbdf4fd0f52d67f0823eeac19c2028c637
 ARG SMART_DOCUMENT_MANAGER_VERSION=1.0.0
 LABEL org.opencontainers.image.title="personal-smart-ocr-mcp" \
       org.opencontainers.image.description="MCP server exposing Smart Document Manager" \
-      org.opencontainers.image.version="${SMART_DOCUMENT_MANAGER_VERSION}"
+      org.opencontainers.image.version="${SMART_DOCUMENT_MANAGER_VERSION}" \
+      org.opencontainers.image.licenses="AGPL-3.0-only"
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -100,7 +106,8 @@ ENV PYTHONUNBUFFERED=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
 WORKDIR /app
-COPY ocr-mcp-server/pyproject.toml ocr-mcp-server/README.md ./
+# LICENSE is the wheel's license-files entry; the build fails without it.
+COPY ocr-mcp-server/pyproject.toml ocr-mcp-server/README.md ocr-mcp-server/LICENSE ./
 COPY ocr-mcp-server/ocr_mcp ./ocr_mcp
 RUN pip install --no-cache-dir --upgrade pip==26.2.1 setuptools==84.2.1 \
     && pip install --no-cache-dir . \

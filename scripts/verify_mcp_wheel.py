@@ -16,6 +16,8 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import zipfile
+from email.parser import HeaderParser
 from pathlib import Path
 
 
@@ -23,6 +25,28 @@ def require(condition: bool, message: str) -> None:
     """Keep verification active under Python -O."""
     if not condition:
         raise RuntimeError(message)
+
+
+def wheel_licence(wheel: Path) -> str:
+    """Check that the wheel declares AGPL-3.0-only and bundles its LICENSE."""
+    with zipfile.ZipFile(wheel) as archive:
+        names = archive.namelist()
+        metadata_name = next(
+            (name for name in names if name.endswith(".dist-info/METADATA")), None
+        )
+        require(metadata_name is not None, "Wheel metadata is missing")
+        metadata = HeaderParser().parsestr(archive.read(metadata_name).decode())
+        dist_info = metadata_name.rsplit("/", 1)[0]
+        require(
+            metadata["License-Expression"] == "AGPL-3.0-only",
+            "Wheel does not declare AGPL-3.0-only",
+        )
+        require(
+            metadata.get_all("License-File") == ["LICENSE"]
+            and f"{dist_info}/licenses/LICENSE" in names,
+            "Wheel does not bundle LICENSE",
+        )
+    return metadata["License-Expression"]
 
 
 def clean_environment() -> dict[str, str]:
@@ -170,6 +194,7 @@ def main() -> None:
         wheels = list((work / "dist").glob("*.whl"))
         require(len(wheels) == 1, "Wheel build did not produce exactly one wheel")
         wheel = wheels[0]
+        licence = wheel_licence(wheel)
         run_stage(
             [uv, "venv", *offline, "--python", sys.executable, str(work / "venv")],
             cwd=work,
@@ -199,12 +224,13 @@ def main() -> None:
         report = json.loads(result)
         report["wheel"] = wheel.name
         report["wheel_sha256"] = hashlib.sha256(wheel.read_bytes()).hexdigest()
+        report["license"] = licence
     args.report.parent.mkdir(parents=True, exist_ok=True)
     args.report.write_text(json.dumps(report, indent=2) + "\n", "utf-8")
     print(
         (
-            "MCP wheel verified: isolated Python 3.11 install, packaged docs, "
-            "entrypoint and stdio inventory."
+            "MCP wheel verified: licence metadata, isolated Python 3.11 install, "
+            "packaged docs, entrypoint and stdio inventory."
         )
     )
 

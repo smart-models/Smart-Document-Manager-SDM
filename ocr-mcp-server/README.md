@@ -418,6 +418,9 @@ Live OCR quality must be assessed using representative documents.
 - Hatch build artifacts explicitly retain the published Markdown and HTML files
   despite parent VCS ignore rules, in both sdist and wheel builds.
   `scripts/verify_mcp_wheel.py` checks resource reads in an isolated installation.
+- The wheel declares `AGPL-3.0-only` and bundles `LICENSE`, a copy of the
+  repository's `LICENSE`: `tests/test_third_party_notices.py` keeps the two equal
+  and `scripts/verify_mcp_wheel.py` checks the built wheel's metadata.
 
 ## Extending it
 

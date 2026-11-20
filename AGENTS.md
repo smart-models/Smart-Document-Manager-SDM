@@ -480,7 +480,8 @@ Things that have already cost time here.
 | File | Role |
 |---|---|
 | `README.md` | The human operator's entry point and API/benchmark reference. |
-| `LICENSE` | Repository license (GNU AGPL v3). |
+| `LICENSE` | Repository license (GNU AGPL v3). `ocr-mcp-server/LICENSE` is a copy for the wheel, kept equal by `tests/test_third_party_notices.py`. |
+| `NOTICE` | The parts of the repository that come from other projects (fonts, vendored console libraries, test images, adapted prompts), each with its licence and the file holding the licence text. Update it when a third-party file is added or changed; `tests/test_third_party_notices.py` checks it against `frontend/vendor-manifest.json`. |
 | `SECURITY.md` | Vulnerability reporting policy: supported versions, the private GitHub reporting route, response targets and scope. |
 | `CONTRIBUTING.md` | How a contribution is proposed (issue first; a pull request only once the issue is assigned) and accepted: Contributor Agreement signature, DCO sign-off on every commit, rules for AI-assisted work. |
 | `CONTRIBUTOR-AGREEMENT.md`, `CONTRIBUTOR-AGREEMENT-SIGNATURES.md` | The contributor agreement (Harmony HA-CLA-I 1.0, Outbound Option Two: AGPL only, with or without the permitted section 7 additional permissions; MIT also for `ocr-skill/` and its verbatim copies under `ocr-mcp-server/ocr_mcp/resources/docs/`) and the signatures, one line per contributor added in their first pull request. Owned by the maintainer; never edit either without being asked, and never add a signature on someone's behalf. |

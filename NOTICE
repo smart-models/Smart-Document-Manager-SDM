@@ -1,0 +1,107 @@
+Smart Document Manager (SDM)
+Copyright (C) 2026 Federico Palma and the contributors to Smart Document
+Manager (SDM).
+
+SDM is licensed under the GNU Affero General Public License, version 3
+(LICENSE). The parts listed below come from other projects and keep their
+own licences; each entry names the file that holds the licence text.
+
+Console fonts and libraries (frontend/dist/assets/)
+---------------------------------------------------
+
+Barlow Condensed font
+    frontend/dist/assets/fonts/barlow-condensed-*.woff2, and embedded in
+    guide/*.html and their copies under
+    ocr-mcp-server/ocr_mcp/resources/docs/guide/.
+    SIL Open Font License 1.1. Copyright 2017 The Barlow Project Authors
+    (https://github.com/jpt/barlow).
+    See frontend/dist/assets/fonts/FONT-LICENSES.txt and
+    guide/FONT-LICENSES.txt; each guide page also embeds the notice.
+
+JetBrains Mono font
+    frontend/dist/assets/fonts/jetbrains-mono-var.woff2, and embedded in
+    guide/*.html and their copies under
+    ocr-mcp-server/ocr_mcp/resources/docs/guide/.
+    SIL Open Font License 1.1. Copyright 2020 The JetBrains Mono Project
+    Authors (https://github.com/JetBrains/JetBrainsMono).
+    See frontend/dist/assets/fonts/FONT-LICENSES.txt and
+    guide/FONT-LICENSES.txt; each guide page also embeds the notice.
+
+DOMPurify 3.4.12
+    frontend/dist/assets/vendor/purify.es.mjs
+    Apache License 2.0 or Mozilla Public License 2.0, at the recipient's
+    choice. Copyright Cure53 and other contributors.
+    See frontend/dist/assets/vendor/purify.LICENSE.txt and
+    frontend/dist/assets/vendor/purify.LICENSE-MPL.txt.
+
+Marked 16.4.2
+    frontend/dist/assets/vendor/marked.esm.js
+    MIT. Copyright (c) 2018+, MarkedJS; Copyright (c) 2011-2018, Christopher
+    Jeffrey. Includes the BSD notice of Markdown, Copyright (c) 2004, John
+    Gruber. See frontend/dist/assets/vendor/marked.LICENSE.md.
+
+KaTeX 0.18.7
+    frontend/dist/assets/vendor/katex/katex.mjs and katex.min.css
+    MIT. Copyright (c) 2013-2020 Khan Academy and other contributors.
+    See frontend/dist/assets/vendor/katex/LICENSE.
+    frontend/dist/assets/vendor/katex/fonts/
+    SIL Open Font License 1.1. Copyright (c) 2009-2010, Design Science,
+    Inc.; Copyright (c) 2014-2018 Khan Academy.
+    See frontend/dist/assets/vendor/katex/fonts/OFL.txt.
+
+PDF.js 3.11.174
+    frontend/dist/assets/vendor/pdf.min.js and pdf.worker.min.js
+    Apache License 2.0. Copyright 2023 Mozilla Foundation.
+    See frontend/dist/assets/vendor/pdf.LICENSE.txt.
+
+frontend/vendor-manifest.json records the origin, version and SHA-256 of
+every file under frontend/dist/assets/vendor/, and
+scripts/verify_frontend_assets.py checks them.
+
+Other files from other projects
+-------------------------------
+
+DejaVu Sans 2.37 font
+    calibration/fonts/DejaVuSans.ttf
+    Bitstream Vera and Arev font licences. Copyright (c) 2003 Bitstream,
+    Inc.; Copyright (c) 2006 Tavmjong Bah; DejaVu changes are in the public
+    domain. See calibration/fonts/LICENSE.
+
+IRS Form 943 (2025)
+    calibration/form943.pdf and its text, calibration/form943.txt
+    A work of the United States government, not subject to copyright in
+    the United States.
+
+PaddleOCR test images
+    the files marked "origin": "paddleocr" in
+    frontend/tests/testbook/documents/manifest.json
+    Apache License 2.0. Copied unchanged from
+    https://github.com/PaddlePaddle/PaddleOCR at the commit named there.
+    See frontend/tests/testbook/documents/LICENSE-PaddleOCR.txt.
+
+ocrserver/element_ocr.py
+    The task prompts and preprocessing rules come from the
+    PaddlePaddle/PaddleOCR-VL-1.6 model card (Apache License 2.0),
+    https://huggingface.co/PaddlePaddle/PaddleOCR-VL-1.6.
+
+Developer Certificate of Origin 1.1, reproduced in CONTRIBUTING.md
+    Copyright (C) 2004, 2006 The Linux Foundation and its contributors.
+    Everyone is permitted to copy and distribute verbatim copies of that
+    document, but changing it is not allowed.
+
+CONTRIBUTOR-AGREEMENT.md
+    Based on the Harmony Individual Contributor License Agreement 1.0,
+    Creative Commons Attribution 3.0 Unported; its last section lists the
+    changes.
+
+Components that are not part of this repository
+-----------------------------------------------
+
+The following are downloaded when the stack is built or started, never
+redistributed here, and keep their own licences:
+
+- The PaddlePaddle/PaddleOCR-VL-1.6 and PaddlePaddle/PP-DocLayoutV3 models
+  (Apache License 2.0).
+- Python packages listed under requirements/, the base images named in
+  Dockerfile and Dockerfile.vllm, and the Debian packages installed in
+  them (including LibreOffice), each under its own licence.

@@ -52,7 +52,7 @@ frontend/playwright.config.mjs
 frontend/playwright.guides.config.js
 
 # Repository guidance and root metadata not needed inside the container.
+# LICENSE and NOTICE are not listed: the ocr-api image ships both.
 README.md
 AGENTS.md
-LICENSE
 pyproject.toml

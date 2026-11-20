@@ -1,6 +1,9 @@
 """Element-level task prompts, spotting preprocessing, and box parsing.
 
-Preprocessing rules follow the PaddleOCR-VL-1.6 model card exactly.
+Preprocessing rules follow the PaddleOCR-VL-1.6 model card exactly. The task
+prompts and preprocessing rules come from that card,
+https://huggingface.co/PaddlePaddle/PaddleOCR-VL-1.6, published by
+PaddlePaddle under the Apache License 2.0 (see NOTICE).
 """
 
 from __future__ import annotations

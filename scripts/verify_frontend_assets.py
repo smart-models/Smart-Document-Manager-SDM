@@ -13,17 +13,29 @@ from pathlib import Path
 
 
 def verify_assets(frontend_root: Path) -> list[str]:
-    """Validate vendor metadata and hashes, rejecting paths outside the root."""
+    """Validate vendor metadata and hashes, rejecting paths outside the root.
+
+    Every asset names, in ``license_file``, the licence text that ships with
+    it; that text must itself be a listed, hash-checked asset.
+    """
     root = frontend_root.resolve()
     manifest = json.loads((root / "vendor-manifest.json").read_text("utf-8"))
     if (
-        manifest.get("schema_version") != 1
+        manifest.get("schema_version") != 2
         or not isinstance(manifest.get("assets"), list)
         or not manifest["assets"]
     ):
         raise ValueError("Invalid vendor manifest schema")
     verified = []
-    required = {"name", "version", "path", "origin", "sha256", "license"}
+    required = {
+        "name",
+        "version",
+        "path",
+        "origin",
+        "sha256",
+        "license",
+        "license_file",
+    }
     for entry in manifest["assets"]:
         if not isinstance(entry, dict) or any(
             not isinstance(entry.get(key), str) or not entry[key] for key in required
@@ -39,6 +51,9 @@ def verify_assets(frontend_root: Path) -> list[str]:
         if actual != entry["sha256"]:
             raise ValueError(f"Vendor asset integrity mismatch: {entry['path']}")
         verified.append(entry["path"])
+    for entry in manifest["assets"]:
+        if entry["license_file"] not in verified:
+            raise ValueError(f"Vendor licence text is not listed: {entry['path']}")
     return verified
 
 
