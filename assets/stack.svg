@@ -109,13 +109,41 @@
   <text x="410" y="44" text-anchor="middle" class="eyebrow" style="fill: #8bc5ff">SMART DOCUMENT MANAGER</text>
   <text x="410" y="96" text-anchor="middle" class="heading" font-size="40" letter-spacing="-.9">One stack. Document intelligence &amp; RAG.</text>
   <text x="410" y="128" text-anchor="middle" class="body" style="font-size: 17px">Local VLM OCR, deterministic RAG chunking, and a direct path for apps and agents.</text>
+  <!-- The SDM logo, inlined from assets/logo.svg (keep the two in step). -->
   <g transform="translate(1100 36) scale(.46)">
-    <circle cx="64" cy="64" r="64" fill="#000000" stroke="#29405b" stroke-width="2"/>
-    <g stroke-width="12.73" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M30 22H62L78 38V88H30Z" fill="none" stroke="#2e6db4"/>
-      <path d="M46 38H78L94 54V104H46Z" fill="#000000" stroke="#5aa9ff"/>
-      <path d="M78 38V54H94" fill="none" stroke="#5aa9ff"/>
-      <path d="M60 72H80M60 88H70" fill="none" stroke="#5aa9ff"/>
+    <defs>
+      <radialGradient id="sdm-disc" gradientUnits="userSpaceOnUse" cx="64" cy="141" r="108">
+        <stop offset="0" stop-color="#14424c"/>
+        <stop offset=".7" stop-color="#07080d"/>
+      </radialGradient>
+      <linearGradient id="sdm-back" gradientUnits="userSpaceOnUse" x1="0" y1="25.35" x2="0" y2="89.49">
+        <stop offset="0" stop-color="#a078ff"/>
+        <stop offset="1" stop-color="#7853db"/>
+      </linearGradient>
+      <linearGradient id="sdm-ring" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="128">
+        <stop offset="0" stop-color="#a078ff"/>
+        <stop offset="1" stop-color="#7853db"/>
+      </linearGradient>
+      <linearGradient id="sdm-front" gradientUnits="userSpaceOnUse" x1="0" y1="38.51" x2="0" y2="102.65">
+        <stop offset="0" stop-color="#29e6ff"/>
+        <stop offset="1" stop-color="#52a8ff"/>
+      </linearGradient>
+      <clipPath id="sdm-clip"><circle cx="64" cy="64" r="64"/></clipPath>
+      <filter id="sdm-blur" filterUnits="userSpaceOnUse" x="0" y="0" width="128" height="128">
+        <feGaussianBlur stdDeviation="3.2"/>
+      </filter>
+      <path id="sdm-sheet-back" d="M37.69 30.29H64L77.16 43.44V84.56H37.69Z"/>
+      <path id="sdm-sheet-front" d="M50.84 43.44H77.16L90.31 56.6V97.71H50.84Z"/>
+    </defs>
+    <circle cx="64" cy="64" r="64" fill="url(#sdm-disc)"/>
+    <circle cx="64" cy="64" r="62" fill="none" stroke="url(#sdm-ring)" stroke-width="4"/>
+    <g clip-path="url(#sdm-clip)" fill="none" stroke-width="10.47" stroke-linecap="round" stroke-linejoin="round">
+      <use href="#sdm-sheet-back" stroke="url(#sdm-back)" filter="url(#sdm-blur)" opacity=".5"/>
+      <use href="#sdm-sheet-back" stroke="url(#sdm-back)"/>
+      <use href="#sdm-sheet-front" stroke="url(#sdm-front)" filter="url(#sdm-blur)" opacity=".5"/>
+      <use href="#sdm-sheet-front" fill="url(#sdm-disc)"/>
+      <use href="#sdm-sheet-front" stroke="url(#sdm-front)"/>
+      <path d="M77.16 43.44V56.6H90.31M62.36 71.4H78.8M62.36 84.56H70.58" stroke="url(#sdm-front)"/>
     </g>
   </g>
 

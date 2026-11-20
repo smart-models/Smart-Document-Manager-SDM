@@ -195,6 +195,13 @@ The guide set is offline, single-file and illustrative. It contains template
 defaults and synthetic examples only. Controls produce text or adjust
 explanations, never operate the application. Both shells stay visible together.
 
+Every page inlines the SDM logo from [`assets/logo.svg`](../assets/logo.svg)
+twice, without its comment: the favicon as a percent-encoded `data:` URI and
+the header brand mark as an inline, `aria-hidden` SVG. Its `sdm-` ids are
+unique on each page. A logo change updates all six pages, their MCP copies and
+the mark in [`assets/stack.svg`](../assets/stack.svg) in the same change; the
+web console logo under `frontend/dist/assets/` is separate.
+
 ## Extending it
 
 Add a domain page only for a distinct lesson. Start from an existing page as the

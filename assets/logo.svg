@@ -1,1 +1,59 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128" role="img" aria-label="Smart Document Manager (SDM)"><circle cx="64" cy="64" r="64" fill="#000000"/><g stroke-width="12.73" stroke-linecap="round" stroke-linejoin="round"><path d="M30 22H62L78 38V88H30Z" fill="none" stroke="#2e6db4"/><path d="M46 38H78L94 54V104H46Z" fill="#000000" stroke="#5aa9ff"/><path d="M78 38V54H94" fill="none" stroke="#5aa9ff"/><path d="M60 72H80M60 88H70" fill="none" stroke="#5aa9ff"/></g></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128" role="img" aria-label="Smart Document Manager (SDM)">
+  <!-- SDM logo in the website palette. The front sheet runs from cyan to azure, the two tints
+       that close the gradient of the website logo (logo-name token of its styles.css). Solid
+       cyan over the whole sheet, or a cyan lightened at the top, looked almost white at this
+       stroke width next to the violet and magenta of the two logos. The back sheet uses the
+       violet of the "3" in the 3S logo (same gradient, light at the top and dark at the
+       bottom). The disc uses the deep page background (bg-deep token) with a glow from below
+       in the tool colour, and a solid ring as thick as the 3S logo ring and in the same violet
+       as the back sheet. The violet is the website one: its violet token at the top (#a078ff),
+       darker at the bottom. The SDM card on the website uses the same token.
+       Each sheet is drawn twice: a blurred copy underneath makes the halo, and the sharp
+       stroke on top stays outside the filter, so it keeps its definition on high-density
+       screens. The inside of the front sheet is filled with the disc gradient: it hides the
+       back sheet and the halo without leaving a patch, and the lines stay legible at 24 px.
+       Both sheets are 82% of the original drawing (stroke included, from 12.73 to 10.47) and
+       centred in the disc: the point farthest from the centre sits 48 units away, as in the
+       3S logo, so both logos leave the same margin from the edge.
+       Every id carries the sdm prefix, so the artwork can be inlined into a page next to the
+       3S logo, or any other markup, without an id collision.
+       Inlined copies: the favicon and the header mark of the six guide/*.html field guides
+       (and their byte-for-byte MCP copies under ocr-mcp-server/ocr_mcp/resources/docs/guide/)
+       and the mark in assets/stack.svg repeat this artwork without this comment; change them
+       together with this file. The web console keeps its own logo in frontend/dist/assets/.
+       No double hyphen inside comments: SVG, being XML, does not allow it. -->
+  <defs>
+    <radialGradient id="sdm-disc" gradientUnits="userSpaceOnUse" cx="64" cy="141" r="108">
+      <stop offset="0" stop-color="#14424c"/>
+      <stop offset=".7" stop-color="#07080d"/>
+    </radialGradient>
+    <linearGradient id="sdm-back" gradientUnits="userSpaceOnUse" x1="0" y1="25.35" x2="0" y2="89.49">
+      <stop offset="0" stop-color="#a078ff"/>
+      <stop offset="1" stop-color="#7853db"/>
+    </linearGradient>
+    <linearGradient id="sdm-ring" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="128">
+      <stop offset="0" stop-color="#a078ff"/>
+      <stop offset="1" stop-color="#7853db"/>
+    </linearGradient>
+    <linearGradient id="sdm-front" gradientUnits="userSpaceOnUse" x1="0" y1="38.51" x2="0" y2="102.65">
+      <stop offset="0" stop-color="#29e6ff"/>
+      <stop offset="1" stop-color="#52a8ff"/>
+    </linearGradient>
+    <clipPath id="sdm-clip"><circle cx="64" cy="64" r="64"/></clipPath>
+    <filter id="sdm-blur" filterUnits="userSpaceOnUse" x="0" y="0" width="128" height="128">
+      <feGaussianBlur stdDeviation="3.2"/>
+    </filter>
+    <path id="sdm-sheet-back" d="M37.69 30.29H64L77.16 43.44V84.56H37.69Z"/>
+    <path id="sdm-sheet-front" d="M50.84 43.44H77.16L90.31 56.6V97.71H50.84Z"/>
+  </defs>
+  <circle cx="64" cy="64" r="64" fill="url(#sdm-disc)"/>
+  <circle cx="64" cy="64" r="62" fill="none" stroke="url(#sdm-ring)" stroke-width="4"/>
+  <g clip-path="url(#sdm-clip)" fill="none" stroke-width="10.47" stroke-linecap="round" stroke-linejoin="round">
+    <use href="#sdm-sheet-back" stroke="url(#sdm-back)" filter="url(#sdm-blur)" opacity=".5"/>
+    <use href="#sdm-sheet-back" stroke="url(#sdm-back)"/>
+    <use href="#sdm-sheet-front" stroke="url(#sdm-front)" filter="url(#sdm-blur)" opacity=".5"/>
+    <use href="#sdm-sheet-front" fill="url(#sdm-disc)"/>
+    <use href="#sdm-sheet-front" stroke="url(#sdm-front)"/>
+    <path d="M77.16 43.44V56.6H90.31M62.36 71.4H78.8M62.36 84.56H70.58" stroke="url(#sdm-front)"/>
+  </g>
+</svg>
