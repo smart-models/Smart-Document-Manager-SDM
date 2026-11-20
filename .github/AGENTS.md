@@ -43,6 +43,7 @@ triggers, permissions and evidence requirements.
 | [workflows/release-check.yml](workflows/release-check.yml) | Reused `ci.yml`, inventory/security-constraint check, OSV audit and SHA-256 evidence bundle (`manifest.json`). | Changing the automated subset of release acceptance. |
 | [dependabot.yml](dependabot.yml) | Monthly grouped update PRs for GitHub Actions pinned to commit SHAs. | Changing how action updates are proposed. |
 | [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) | Operator release steps, outcome definitions, numbered evidence bundle and rerun/abort rules. | Assessing whether a candidate has sufficient evidence to release. |
+| [PULL_REQUEST_TEMPLATE.md](PULL_REQUEST_TEMPLATE.md) | The body every pull request opens with: linked issue, verification, and the assignment, Contributor Agreement and sign-off checklist from [CONTRIBUTING.md](../CONTRIBUTING.md). | Changing what a contributor must confirm when opening a pull request. |
 | [../scripts/verify_dependencies.py](../scripts/verify_dependencies.py) | OSV queries, expiring triage evaluation and CycloneDX SBOM output. | Changing audit parsing or report format. |
 | [../scripts/release_evidence.py](../scripts/release_evidence.py) | Required-artifact verification and SHA-256 manifest builder. | Changing release evidence format. |
 | [../tests/test_ci_workflow.py](../tests/test_ci_workflow.py) | Workflow contract tests (permissions, SHA pins, aggregate gate, npm lock, SBOM parity). | Changing workflow wiring. |
