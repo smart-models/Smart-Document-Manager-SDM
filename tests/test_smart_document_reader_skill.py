@@ -69,7 +69,9 @@ def test_skill_frontmatter_length_links_and_rules():
     frontmatter = yaml.safe_load(match.group(1))
     assert frontmatter["name"] == "smart-document-reader"
     assert_what_and_when(frontmatter["description"])
-    assert 120 <= len(text.splitlines()) <= 240
+    # The frontmatter licence line is metadata and does not spend the budget.
+    lines = [line for line in text.splitlines() if not line.startswith("license:")]
+    assert 120 <= len(lines) <= 240
     assert "references/" in text
     for reference in ("block-types.md", "document-types.md"):
         assert reference in text

@@ -37,6 +37,7 @@ again when the JSON is already available. Installing a skill starts no process.
 | `smart-document-reader/SKILL.md` | How to read existing OCR JSON | Interpretation guidance changes |
 | `smart-document-reader/references/block-types.md` | Layout-tag behavior | Pipeline labels or ordering change |
 | `smart-document-reader/references/document-types.md` | Document-specific interpretation | A supported document pattern needs guidance |
+| `smart-document-manager/LICENSE.txt`, `smart-document-reader/LICENSE.txt` | The MIT licence text, inside each skill directory so it travels with every installed copy; scope under [License](#license) | Never, except to update the copyright line |
 
 ## Interface reference
 
@@ -188,6 +189,17 @@ carries routing, locality, cost and consent rules, the references carry exact
 fields. Write new examples as MCP calls (`name` plus `arguments`) with concrete
 values. Before changing behaviour-shaping text, add or update an eval case and
 compare the new text against a snapshot of the old one.
+
+## License
+
+Everything under `ocr-skill/` is MIT-licensed — see
+[`smart-document-manager/LICENSE.txt`](smart-document-manager/LICENSE.txt) and
+[`smart-document-reader/LICENSE.txt`](smart-document-reader/LICENSE.txt) — so a
+skill can be copied into any agent host or product. That covers the copies of
+this file and of the operating skill that the MCP server ships under
+`ocr-mcp-server/ocr_mcp/resources/docs/`, and these files as published in
+releases 1.0.0 and 1.0.1. The rest of the repository is AGPL-3.0-only: see
+[`../LICENSE`](../LICENSE) and [`../NOTICE`](../NOTICE).
 
 ## Related documents
 

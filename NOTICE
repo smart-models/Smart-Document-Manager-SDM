@@ -2,9 +2,20 @@ Smart Document Manager (SDM)
 Copyright (C) 2026 Federico Palma and the contributors to Smart Document
 Manager (SDM).
 
-SDM is licensed under the GNU Affero General Public License, version 3
-(LICENSE). The parts listed below come from other projects and keep their
-own licences; each entry names the file that holds the licence text.
+SDM is licensed under the GNU Affero General Public License, version 3 only
+(LICENSE). The parts listed below are under other licences, most of them
+because they come from other projects; each entry names the file that holds
+the licence text.
+
+Parts of this repository under the MIT License
+----------------------------------------------
+
+ocr-skill/, and its copies in ocr-mcp-server/ocr_mcp/resources/docs/
+(skill.md, skill-readme.md, reference.md, playbooks.md)
+    MIT. Copyright (c) 2026 Federico Palma and the contributors to Smart
+    Document Manager (SDM). See ocr-skill/smart-document-manager/LICENSE.txt
+    and ocr-skill/smart-document-reader/LICENSE.txt. The MIT licence also
+    covers these files as published in releases 1.0.0 and 1.0.1.
 
 Console fonts and libraries (frontend/dist/assets/)
 ---------------------------------------------------

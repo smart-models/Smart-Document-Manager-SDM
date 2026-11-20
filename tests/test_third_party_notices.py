@@ -1,10 +1,11 @@
-"""Every third-party file SDM ships travels with its licence text.
+"""Every file SDM ships under another licence travels with its licence text.
 
 The console fonts and vendored libraries under ``frontend/dist/assets/`` reach
 users inside the ``ocr-api`` image, the guides reach them inside the MCP wheel,
-and both images carry SDM's own ``LICENSE``. ``NOTICE`` is the index: it names
-each component and the file that holds its licence. These checks keep the
-licence texts, the index and the packaging in step.
+the skills under ``ocr-skill/`` are MIT, and both images carry SDM's own
+``LICENSE``. ``NOTICE`` is the index: it names each component and the file that
+holds its licence. These checks keep the licence texts, the index and the
+packaging in step.
 """
 
 from __future__ import annotations
@@ -15,7 +16,10 @@ import re
 import tomllib
 from pathlib import Path
 
+import yaml
+
 ROOT = Path(__file__).resolve().parent.parent
+SKILLS = ("smart-document-manager", "smart-document-reader")
 FRONTEND = ROOT / "frontend"
 KATEX_FONTS = "dist/assets/vendor/katex/fonts/"
 LICENCE_PATH = re.compile(r"[\w./-]+/[\w.-]*(?:LICEN[CS]E|OFL)[\w.-]*")
@@ -113,3 +117,19 @@ def test_mcp_wheel_declares_and_bundles_the_repository_licence():
     assert project["license"] == "AGPL-3.0-only"
     assert project["license-files"] == ["LICENSE"]
     assert read("ocr-mcp-server/LICENSE") == read("LICENSE")
+
+
+def test_skills_are_mit_with_the_copyright_filled_in():
+    licences = {read(f"ocr-skill/{skill}/LICENSE.txt") for skill in SKILLS}
+    assert len(licences) == 1
+    (licence,) = licences
+    assert licence.startswith(
+        "MIT License\n\nCopyright (c) 2026 Federico Palma and the contributors to "
+        "Smart Document\nManager (SDM)\n\nPermission is hereby granted, free of charge"
+    )
+    assert 'THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND' in licence
+    notice = read("NOTICE")
+    for skill in SKILLS:
+        frontmatter = read(f"ocr-skill/{skill}/SKILL.md").split("---", 2)[1]
+        assert yaml.safe_load(frontmatter)["license"].startswith("MIT."), skill
+        assert f"ocr-skill/{skill}/LICENSE.txt" in notice

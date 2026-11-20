@@ -11,6 +11,7 @@ description: >
   files; when browsing, downloading or deleting stored OCR archives; when creating
   or refining RAG chunks; or when an ocr_* call fails, refuses a file or a
   confirmation, returns partial data, or the tools are missing from the client.
+license: MIT. Complete terms in LICENSE.txt
 ---
 
 # Operating Smart Document Manager

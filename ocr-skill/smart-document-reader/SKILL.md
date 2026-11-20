@@ -9,6 +9,7 @@ description: >
   from or restructuring that JSON or archive for any kind of document, or when it
   has null order, null or partial markdown, null blocks, empty blocks, page errors,
   unprocessed pages or unresolved relations.
+license: MIT. Complete terms in LICENSE.txt
 ---
 
 # Reading PaddleOCR-VL parse JSON
